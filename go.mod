@@ -61,7 +61,6 @@ require (
 	github.com/timakin/bodyclose v0.0.0-20190721030226-87058b9bfcec // indirect
 	github.com/ugorji/go v1.1.7 // indirect
 	github.com/valyala/fasthttp v1.4.0 // indirect
-	github.rtplab.nimblestorage.com/dcs/hpe-custom-resources v0.0.0-20190621152735-359ba74a9788 // indirect
 	go.etcd.io/bbolt v1.3.3 // indirect
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect
 	golang.org/x/exp v0.0.0-20190718202018-cfdd5522f6f6 // indirect
