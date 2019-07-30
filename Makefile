@@ -1,5 +1,5 @@
 NAME = k8s-dynamic-provisioner
-REPO_NAME ?= hpe/k8s-dynamic-provisioner
+REPO_NAME ?= hpestorage/k8s-dynamic-provisioner
 
 # Use the latest git tag
 TAG = $(shell git tag|tail -n1)
