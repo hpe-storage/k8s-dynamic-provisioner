@@ -26,13 +26,13 @@ import (
 	"time"
 
 	csi_spec "github.com/container-storage-interface/spec/lib/go/csi"
-	crd_client "github.com/hpe-storage/k8s-custom-resources/pkg/client/clientset/versioned"
-	snap_client "github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned"
-	uuid "github.com/satori/go.uuid"
 	"github.com/hpe-storage/common-host-libs/chain"
 	"github.com/hpe-storage/common-host-libs/docker/dockervol"
 	"github.com/hpe-storage/common-host-libs/jconfig"
-	"github.com/hpe-storage/common-host-libs/util"
+	log "github.com/hpe-storage/common-host-libs/logger"
+	crd_client "github.com/hpe-storage/k8s-custom-resources/pkg/client/clientset/versioned"
+	snap_client "github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned"
+	uuid "github.com/satori/go.uuid"
 	api_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	storage_v1 "k8s.io/api/storage/v1"
@@ -128,10 +128,10 @@ func (p *Provisioner) addMessageChan(id string, channel chan *updateMessage) {
 		return
 	}
 	if channel != nil {
-		util.LogDebug.Printf("addMessageChan: adding %s", id)
+		log.Debugf("addMessageChan: adding %s", id)
 		p.id2chan[id] = channel
 	} else {
-		util.LogDebug.Printf("addMessageChan: creating %s", id)
+		log.Debugf("addMessageChan: creating %s", id)
 		p.id2chan[id] = make(chan *updateMessage, 1024)
 	}
 }
@@ -154,13 +154,13 @@ func (p *Provisioner) sendUpdate(t interface{}) {
 
 	claim, _ := getPersistentVolumeClaim(t)
 	if claim != nil {
-		util.LogDebug.Printf("sendUpdate: pvc:%s (%s) phase:%s", claim.Name, claim.UID, claim.Status.Phase)
+		log.Debugf("sendUpdate: pvc:%s (%s) phase:%s", claim.Name, claim.UID, claim.Status.Phase)
 		id = fmt.Sprintf("%s", claim.UID)
 		mess = &updateMessage{pvc: claim}
 	} else {
 		vol, _ := getPersistentVolume(t)
 		if vol != nil {
-			util.LogDebug.Printf("sendUpdate: pv:%s (%s) phase:%s", vol.Name, vol.UID, vol.Status.Phase)
+			log.Debugf("sendUpdate: pv:%s (%s) phase:%s", vol.Name, vol.UID, vol.Status.Phase)
 			id = fmt.Sprintf("%s", vol.UID)
 			mess = &updateMessage{pv: vol}
 		}
@@ -172,7 +172,7 @@ func (p *Provisioner) sendUpdate(t interface{}) {
 
 	messChan := p.id2chan[id]
 	if messChan == nil {
-		util.LogDebug.Printf("send: skipping %s, not in map", id)
+		log.Debugf("send: skipping %s, not in map", id)
 		return
 	}
 	messChan <- mess
@@ -180,7 +180,7 @@ func (p *Provisioner) sendUpdate(t interface{}) {
 
 // removeMessageChan closes (if open) chan and removes it from the map
 func (p *Provisioner) removeMessageChan(claimID string, volID string) {
-	util.LogDebug.Printf("removeMessageChan called with claimID %s volID %s", claimID, volID)
+	log.Debugf("removeMessageChan called with claimID %s volID %s", claimID, volID)
 	p.id2chanLock.Lock()
 	defer p.id2chanLock.Unlock()
 
@@ -210,7 +210,7 @@ func NewProvisioner(clientSet *kubernetes.Clientset, csiClientSet *csi_client.Cl
 	id := uuid.NewV4()
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&core_v1.EventSinkImpl{Interface: clientSet.CoreV1().Events(v1.NamespaceAll)})
-	util.LogDebug.Printf("provisioner (prefix=*.hpe.com) is being created with instance id %s and id2chan capacity %d.", id.String(), id2chanMapSize)
+	log.Debugf("provisioner (prefix=*.hpe.com) is being created with instance id %s and id2chan capacity %d.", id.String(), id2chanMapSize)
 
 	return &Provisioner{
 		kubeClient:       clientSet,
@@ -228,13 +228,13 @@ func NewProvisioner(clientSet *kubernetes.Clientset, csiClientSet *csi_client.Cl
 
 // update the existing volume's metadata for the claims
 func (p *Provisioner) updateDockerVolumeMetadata(store cache.Store) {
-	util.LogDebug.Print("updateDockerVolumeMetadata started")
+	log.Debug("updateDockerVolumeMetadata started")
 	optionsMap := map[string]interface{}{manager: managerName}
 
 	i := 0
 	for len(store.List()) < 1 {
 		if i > maxWaitForClaims {
-			util.LogInfo.Printf("No Claims found after waiting for %d seconds. Ignoring update", maxWaitForClaims)
+			log.Infof("No Claims found after waiting for %d seconds. Ignoring update", maxWaitForClaims)
 			return
 		}
 		time.Sleep(time.Second)
@@ -244,25 +244,25 @@ func (p *Provisioner) updateDockerVolumeMetadata(store cache.Store) {
 	for _, pvc := range store.List() {
 		claim, err := getPersistentVolumeClaim(pvc)
 		if err != nil {
-			util.LogDebug.Printf("unable to retrieve the claim from %v", pvc)
+			log.Debugf("unable to retrieve the claim from %v", pvc)
 			continue
 		}
 
 		if claim.Status.Phase != api_v1.ClaimBound {
-			util.LogDebug.Printf("claim %s was not bound - skipping", claim.Name)
+			log.Debugf("claim %s was not bound - skipping", claim.Name)
 			continue
 		}
 
 		className := getClaimClassName(claim)
-		util.LogDebug.Printf("found classname %s for claim %s.", className, claim.Name)
+		log.Debugf("found classname %s for claim %s.", className, claim.Name)
 		class, err := p.getClass(className)
 		if err != nil {
-			util.LogError.Printf("unable to retrieve the class object for claim %v", claim)
+			log.Errorf("unable to retrieve the class object for claim %v", claim)
 			continue
 		}
 
 		if !strings.HasPrefix(class.Provisioner, CsiProvisioner) && !strings.HasPrefix(class.Provisioner, FlexVolumeProvisioner) {
-			util.LogInfo.Printf("updateDockerVolumeMetadata: class named %s in pvc %s did not refer to a supported provisioner (name must begin with %s or %s).  current provisioner=%s - skipping", className, claim.Name, CsiProvisioner, FlexVolumeProvisioner, class.Provisioner)
+			log.Infof("updateDockerVolumeMetadata: class named %s in pvc %s did not refer to a supported provisioner (name must begin with %s or %s).  current provisioner=%s - skipping", className, claim.Name, CsiProvisioner, FlexVolumeProvisioner, class.Provisioner)
 			continue
 		}
 
@@ -270,12 +270,12 @@ func (p *Provisioner) updateDockerVolumeMetadata(store cache.Store) {
 		if err != nil {
 			// we don't want to beat on the docker plugin if it doesn't support update
 			// so we simply move on to the next volume if we hit an error
-			util.LogError.Printf("unable to update volume %v Err: %v", claim.Spec.VolumeName, err.Error())
+			log.Errorf("unable to update volume %v Err: %v", claim.Spec.VolumeName, err.Error())
 			continue
 		}
 	}
 
-	util.LogDebug.Print("updateDockerVolumeMetadata ended")
+	log.Debug("updateDockerVolumeMetadata ended")
 }
 
 // Start the provision workflow.  Note that Start will block until there are storage classes found.
@@ -284,7 +284,7 @@ func (p *Provisioner) Start(stop chan struct{}) {
 	// get the server version
 	p.serverVersion, err = p.kubeClient.Discovery().ServerVersion()
 	if err != nil {
-		util.LogError.Printf("Unable to get server version.  %s", err.Error())
+		log.Errorf("Unable to get server version.  %s", err.Error())
 	}
 
 	// Get the StorageClass store and start it's reflector
@@ -315,7 +315,7 @@ func (p *Provisioner) Start(stop chan struct{}) {
 	// Wait for our reflector to load (or for someone to add a Storage Class)
 	p.waitForClasses()
 
-	util.LogDebug.Printf("provisioner has been started and is watching a server with version %s.", p.serverVersion)
+	log.Debugf("provisioner has been started and is watching a server with version %s.", p.serverVersion)
 
 }
 
@@ -324,16 +324,16 @@ func (p *Provisioner) statusLogger() {
 		time.Sleep(statusLoggingWait)
 		_, err := p.kubeClient.Discovery().ServerVersion()
 		if err != nil {
-			util.LogError.Printf("statusLogger: provision chains=%d, delete chains=%d, parked chains=%d, ids tracked=%d, connection error=%s", atomic.LoadUint32(&p.provisionCommandChains), atomic.LoadUint32(&p.deleteCommandChains), atomic.LoadUint32(&p.parkedCommands), len(p.id2chan), err.Error())
+			log.Errorf("statusLogger: provision chains=%d, delete chains=%d, parked chains=%d, ids tracked=%d, connection error=%s", atomic.LoadUint32(&p.provisionCommandChains), atomic.LoadUint32(&p.deleteCommandChains), atomic.LoadUint32(&p.parkedCommands), len(p.id2chan), err.Error())
 			return
 		}
-		util.LogInfo.Printf("statusLogger: provision chains=%d, delete chains=%d, parked chains=%d, ids tracked=%d, connection=valid", atomic.LoadUint32(&p.provisionCommandChains), atomic.LoadUint32(&p.deleteCommandChains), atomic.LoadUint32(&p.parkedCommands), len(p.id2chan))
+		log.Infof("statusLogger: provision chains=%d, delete chains=%d, parked chains=%d, ids tracked=%d, connection=valid", atomic.LoadUint32(&p.provisionCommandChains), atomic.LoadUint32(&p.deleteCommandChains), atomic.LoadUint32(&p.parkedCommands), len(p.id2chan))
 	}
 }
 
 func (p *Provisioner) deleteVolume(pv *api_v1.PersistentVolume, rmPV bool) {
 	provisioner := pv.Annotations[k8sProvisionedBy]
-	util.LogDebug.Printf("provisioner is %s", provisioner)
+	log.Debugf("provisioner is %s", provisioner)
 
 	// slow down a delete storm
 	limit(&p.deleteCommandChains, &p.parkedCommands, maxDeletes)
@@ -344,11 +344,11 @@ func (p *Provisioner) deleteVolume(pv *api_v1.PersistentVolume, rmPV bool) {
 
 	// if the pv was just deleted, make sure we clean up the docker volume
 	if provisioner == CsiProvisioner {
-		util.LogDebug.Printf("in deleteVolume: cleaning up pv:%s Status:%v with deleteChain %d parkedCommands %d", pv.Name, pv.Status, atomic.LoadUint32(&p.deleteCommandChains), atomic.LoadUint32(&p.parkedCommands))
+		log.Debugf("in deleteVolume: cleaning up pv:%s Status:%v with deleteChain %d parkedCommands %d", pv.Name, pv.Status, atomic.LoadUint32(&p.deleteCommandChains), atomic.LoadUint32(&p.parkedCommands))
 		p.deleteCsiVolume(pv, deleteChain)
 	} else {
 		// flexVolume
-		util.LogDebug.Printf("in deleteVolume: cleaning up pv:%s Status:%v with deleteChain %d parkedCommands %d with affectDockerVols %v", pv.Name, pv.Status, atomic.LoadUint32(&p.deleteCommandChains), atomic.LoadUint32(&p.parkedCommands), p.affectDockerVols)
+		log.Debugf("in deleteVolume: cleaning up pv:%s Status:%v with deleteChain %d parkedCommands %d with affectDockerVols %v", pv.Name, pv.Status, atomic.LoadUint32(&p.deleteCommandChains), atomic.LoadUint32(&p.parkedCommands), p.affectDockerVols)
 		p.deleteFlexVolume(pv, deleteChain, provisioner)
 	}
 	if rmPV {
@@ -366,20 +366,20 @@ func (p *Provisioner) deleteVolume(pv *api_v1.PersistentVolume, rmPV bool) {
 	}
 }
 func (p *Provisioner) deleteFlexVolume(pv *api_v1.PersistentVolume, deleteChain *chain.Chain, provisioner string) {
-	util.LogDebug.Printf(">>>>> deleteFlexVolume called")
-	defer util.LogDebug.Printf("<<<<< deleteFlexVolume")
+	log.Debug(">>>>> deleteFlexVolume called")
+	defer log.Debug("<<<<< deleteFlexVolume")
 	if p.affectDockerVols {
 		dockerClient, _, err := p.newDockerVolumePluginClient(provisioner)
 		if err != nil {
 			info := fmt.Sprintf("failed to get docker client for %s while trying to delete pv %s: %v", FlexVolumeProvisioner, pv.Name, err)
-			util.LogError.Print(info)
+			log.Error(info)
 			p.eventRecorder.Event(pv, api_v1.EventTypeWarning, "DeleteVolumeGetClient", info)
 			return
 		}
 		vol := p.getDockerVolume(dockerClient, pv.Name)
 		if vol != nil && vol.Name == pv.Name {
 			p.eventRecorder.Event(pv, api_v1.EventTypeNormal, "DeleteVolume", fmt.Sprintf("cleaning up volume named %s", pv.Name))
-			util.LogDebug.Printf("Docker volume with name %s found.  Delete using %s.", pv.Name, FlexVolumeProvisioner)
+			log.Debugf("Docker volume with name %s found.  Delete using %s.", pv.Name, FlexVolumeProvisioner)
 			deleteChain.AppendRunner(&deleteDockerVol{
 				name:   pv.Name,
 				client: dockerClient,
@@ -390,31 +390,31 @@ func (p *Provisioner) deleteFlexVolume(pv *api_v1.PersistentVolume, deleteChain 
 }
 
 func (p *Provisioner) deleteCsiVolume(pv *api_v1.PersistentVolume, deleteChain *chain.Chain) {
-	util.LogDebug.Printf(">>>>> deleteCsiVolume called")
-	defer util.LogDebug.Printf("<<<<< deleteCsiVolume")
+	log.Debug(">>>>> deleteCsiVolume called")
+	defer log.Debug("<<<<< deleteCsiVolume")
 	// delete csi volume through csi driver
 
 	class, err := p.getClass(pv.Spec.StorageClassName)
 	if err != nil {
-		util.LogError.Printf("unable to retrieve the class object for pv %v", pv)
+		log.Errorf("unable to retrieve the class object for pv %v", pv)
 		return
 	}
 
 	secretRef, err := getSecretReference(csiSecretParams, class.Parameters, pv.Name, nil)
 	if err != nil {
-		util.LogError.Printf("unable to retrieve secret for class %v", class)
+		log.Errorf("unable to retrieve secret for class %v", class)
 		return
 	}
 
 	csiCredentials, err := p.getCredentials(secretRef)
 	if err != nil {
-		util.LogError.Printf("unable to retrieve credentials for class %v", secretRef)
+		log.Errorf("unable to retrieve credentials for class %v", secretRef)
 		return
 	}
 
 	request, err := p.buildCsiVolumeDeleteRequest(pv, csiCredentials, class.Name)
 	if err != nil {
-		util.LogError.Printf("unable to get csi delete request err=%s", err.Error())
+		log.Errorf("unable to get csi delete request err=%s", err.Error())
 		return
 	}
 
@@ -427,10 +427,10 @@ func (p *Provisioner) deleteCsiVolume(pv *api_v1.PersistentVolume, deleteChain *
 }
 
 func (p *Provisioner) updateVolume(claim *api_v1.PersistentVolumeClaim, provisioner string, updateMap map[string]interface{}) error {
-	util.LogDebug.Printf("updateVolume called with claim:%s, provisioner:%s and options:%v", claim.Name, provisioner, updateMap)
+	log.Debugf("updateVolume called with claim:%s, provisioner:%s and options:%v", claim.Name, provisioner, updateMap)
 
 	if provisioner == CsiProvisioner {
-		util.LogInfo.Printf("updateVolume not supported for pvc %s provisioner %s", claim.Name, CsiProvisioner)
+		log.Infof("updateVolume not supported for pvc %s provisioner %s", claim.Name, CsiProvisioner)
 		return nil
 	}
 	// get the volume name for update
@@ -448,11 +448,11 @@ func (p *Provisioner) updateVolume(claim *api_v1.PersistentVolumeClaim, provisio
 	}
 
 	if val, ok := vol.Status[manager]; ok && val != "" {
-		util.LogDebug.Printf("claim:%s has manager set to value %v - skipping", claim.Name, val)
+		log.Debugf("claim:%s has manager set to value %v - skipping", claim.Name, val)
 		return nil
 	}
 
-	util.LogDebug.Printf("invoking VolumeDriver.Update with name :%s updateMap :%v", vol.Name, updateMap)
+	log.Debugf("invoking VolumeDriver.Update with name :%s updateMap :%v", vol.Name, updateMap)
 	_, err = dockerClient.Update(vol.Name, updateMap)
 	if err != nil {
 		return err
@@ -461,8 +461,8 @@ func (p *Provisioner) updateVolume(claim *api_v1.PersistentVolumeClaim, provisio
 }
 
 func (p *Provisioner) provisionVolume(claim *api_v1.PersistentVolumeClaim, class *storage_v1.StorageClass) {
-	util.LogDebug.Printf(">>>>> provisionVolume for %s", claim.UID)
-	defer util.LogDebug.Print("<<<<< provisionVolume")
+	log.Debugf(">>>>> provisionVolume for %s", claim.UID)
+	defer log.Debug("<<<<< provisionVolume")
 	// this can fire multiple times without issue, so we defer this even though we don't have a volume yet
 	id := fmt.Sprintf("%s", claim.UID)
 	defer p.removeMessageChan(id, "")
@@ -500,7 +500,7 @@ func (p *Provisioner) provisionVolume(claim *api_v1.PersistentVolumeClaim, class
 		// check for snapshot in VolumeContentSource for csi
 		isSnapshotNeeded, err := p.checkClaimDataSorce(claim)
 		if err != nil {
-			util.LogError.Printf("error in claim data source pv from %v %v and %v. err=%v", claim, params, class, err)
+			log.Errorf("error in claim data source pv from %v %v and %v. err=%v", claim, params, class, err)
 			return
 		}
 		p.provisionCsiVolume(volumeCreateOptions, claim, isSnapshotNeeded)
@@ -514,7 +514,7 @@ func (p *Provisioner) provisionVolume(claim *api_v1.PersistentVolumeClaim, class
 	p.eventRecorder.Event(class, api_v1.EventTypeNormal, "ProvisionStorage", fmt.Sprintf("%s provisioning storage for pvc %s (%s) using class %s", class.Provisioner, claim.Name, id, class.Name))
 	err := provisionChain.Execute()
 	if err != nil {
-		util.LogError.Printf("failed to create volume for claim %s with class %s: %s", claim.Name, class.Name, err)
+		log.Errorf("failed to create volume for claim %s with class %s: %s", claim.Name, class.Name, err)
 		p.eventRecorder.Event(class, api_v1.EventTypeWarning, "ProvisionStorage",
 			fmt.Sprintf("failed to create volume for claim %s with class %s: %s", claim.Name, class.Name, err))
 	}
@@ -527,26 +527,26 @@ func (p *Provisioner) provisionVolume(claim *api_v1.PersistentVolumeClaim, class
 }
 
 func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
-	util.LogDebug.Printf(">>>>> provisionFlexVolume")
-	defer util.LogDebug.Print("<<<<< provisionFlexVolume")
+	log.Debug(">>>>> provisionFlexVolume")
+	defer log.Debug("<<<<< provisionFlexVolume")
 	p.dockerVolNameAnnotation = FlexVolumeProvisioner + "/" + dockerVolumeName
 	pv, err := p.newFlexVolPersistentVolume(options.volName, options.classParams, options.claim, options.class)
 	if err != nil {
-		util.LogError.Printf("error building pv from %v %v and %v. err=%v", options.claim, options.classParams, options.class, err)
+		log.Errorf("error building pv from %v %v and %v. err=%v", options.claim, options.classParams, options.class, err)
 		return
 	}
 	var dockerClient *dockervol.DockerVolumePlugin
 	var dockerOptions map[string]interface{}
 	dockerClient, dockerOptions, err = p.newDockerVolumePluginClient(options.class.Provisioner)
 	if err != nil {
-		util.LogError.Printf("unable to get docker client for class %v while trying to provision pvc named %s (%s): %s", options.class, options.claim.Name, options.claimID, err)
+		log.Errorf("unable to get docker client for class %v while trying to provision pvc named %s (%s): %s", options.class, options.claim.Name, options.claimID, err)
 		p.eventRecorder.Event(options.class, api_v1.EventTypeWarning, "ProvisionVolumeGetClient",
 			fmt.Sprintf("failed to get docker volume client for class %s while trying to provision claim %s (%s): %s", options.class.Name, options.claim.Name, options.claimID, err))
 		return
 	}
 	vol := p.getDockerVolume(dockerClient, options.volName)
 	if vol != nil && options.volName == vol.Name {
-		util.LogError.Printf("error provisioning pv from %v and %v. err=Docker volume with this name was found %v.", options.claim, options.class, vol)
+		log.Errorf("error provisioning pv from %v and %v. err=Docker volume with this name was found %v.", options.claim, options.class, vol)
 		return
 	}
 
@@ -557,7 +557,7 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 	var optionsMap map[string]interface{}
 	optionsMap, err = p.parseStorageClassParams(options.classParams, options.class, sizeForDockerVolumeinGib, dockerClient.ListOfStorageResourceOptions, options.nameSpace)
 	if err != nil {
-		util.LogError.Printf("error parsing storage class parameters from %v %v and %v. err=%v", options.claim, options.classParams, options.class, err)
+		log.Errorf("error parsing storage class parameters from %v %v and %v. err=%v", options.claim, options.classParams, options.class, err)
 		return
 	}
 
@@ -565,11 +565,11 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 	optionsMap, err = p.getClaimOverrideOptions(options.claim, overrideKeys, optionsMap, FlexVolumeProvisioner)
 	if err != nil {
 		p.eventRecorder.Event(options.class, api_v1.EventTypeWarning, "ProvisionStorage", err.Error())
-		util.LogError.Printf("error handling annotations. err=%v", err)
+		log.Errorf("error handling annotations. err=%v", err)
 		return
 	}
 
-	util.LogDebug.Printf("updated optionsMap with overrideKeys %#v", optionsMap)
+	log.Debugf("updated optionsMap with overrideKeys %#v", optionsMap)
 
 	// set default docker options if not already set
 	p.setDefaultDockerOptions(optionsMap, options.classParams, dockerOptions, dockerClient)
@@ -595,30 +595,30 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 
 // nolint: gocyclo
 func (p *Provisioner) provisionCsiVolume(options *volumeCreateOptions, claim *api_v1.PersistentVolumeClaim, isSnapshotNeeded bool) {
-	util.LogDebug.Printf(">>>>> provisionCsiVolume called for PVC %s", claim.Name)
-	defer util.LogDebug.Print("<<<<< provisionCsiVolume")
+	log.Debugf(">>>>> provisionCsiVolume called for PVC %s", claim.Name)
+	defer log.Debug("<<<<< provisionCsiVolume")
 
 	// ported from external provisioner to retrieve secrets
 	var err error
 	options.secretRef, err = getSecretReference(csiSecretParams, options.class.Parameters, options.volName, nil)
 	if err != nil {
-		util.LogError.Printf("unable to get secretReference for %s %s", options.volName, err.Error())
+		log.Errorf("unable to get secretReference for %s %s", options.volName, err.Error())
 		return
 	}
 	pv, err := p.newCsiPersistentVolume(options)
 	if err != nil {
-		util.LogError.Printf("error building pv from %v %v and %v. err=%v", options.claim, options.classParams, options.class, err)
+		log.Errorf("error building pv from %v %v and %v. err=%v", options.claim, options.classParams, options.class, err)
 		return
 	}
 	csiCredentials, err := p.getCredentials(options.secretRef)
 	if err != nil {
-		util.LogError.Printf("unable to retrieve credentials for class %v", options.secretRef)
+		log.Errorf("unable to retrieve credentials for class %v", options.secretRef)
 		return
 	}
 
 	request, err := p.buildCsiVolumeCreateRequest(options.volName, options.class, options.claim, csiCredentials)
 	if err != nil {
-		util.LogError.Printf("unable to build CSI Create Request %s", err.Error())
+		log.Errorf("unable to build CSI Create Request %s", err.Error())
 		return
 	}
 
@@ -627,17 +627,17 @@ func (p *Provisioner) provisionCsiVolume(options *volumeCreateOptions, claim *ap
 		var isSnapCapSupported bool
 		isSnapCapSupported, err = p.isCapabilitySupported(csi_spec.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT)
 		if err != nil {
-			util.LogError.Printf("error validating if %s is supported in %s, err=%s", csi_spec.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT, CsiProvisioner, err.Error())
+			log.Errorf("error validating if %s is supported in %s, err=%s", csi_spec.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT, CsiProvisioner, err.Error())
 			return
 		}
 		if !isSnapCapSupported {
-			util.LogError.Printf("%s is not supported by %s", csi_spec.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT, CsiProvisioner)
+			log.Errorf("%s is not supported by %s", csi_spec.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT, CsiProvisioner)
 			return
 		}
 		var volumeContentSource *csi_spec.VolumeContentSource
 		volumeContentSource, err = p.getVolumeContentSource(claim)
 		if err != nil {
-			util.LogError.Printf("error getting snapshot handle for snapshot %s: %v", claim.Spec.DataSource.Name, err)
+			log.Errorf("error getting snapshot handle for snapshot %s: %v", claim.Spec.DataSource.Name, err)
 			return
 		}
 		request.VolumeContentSource = volumeContentSource
@@ -649,7 +649,7 @@ func (p *Provisioner) provisionCsiVolume(options *volumeCreateOptions, claim *ap
 	var optionsMap map[string]interface{}
 	optionsMap, err = p.parseStorageClassParams(options.classParams, options.class, 0, nil, options.nameSpace)
 	if err != nil {
-		util.LogError.Printf("error parsing storage class parameters from %v %v and %v. err=%v", options.claim, options.classParams, options.class, err)
+		log.Errorf("error parsing storage class parameters from %v %v and %v. err=%v", options.claim, options.classParams, options.class, err)
 		return
 	}
 
@@ -657,7 +657,7 @@ func (p *Provisioner) provisionCsiVolume(options *volumeCreateOptions, claim *ap
 	optionsMap, err = p.getClaimOverrideOptions(options.claim, overrideKeys, optionsMap, CsiProvisioner)
 	if err != nil {
 		p.eventRecorder.Event(options.class, api_v1.EventTypeWarning, "ProvisionStorage", err.Error())
-		util.LogError.Printf("error handling annotations. err=%v", err)
+		log.Errorf("error handling annotations. err=%v", err)
 		return
 	}
 
@@ -690,15 +690,15 @@ func (p *Provisioner) provisionCsiVolume(options *volumeCreateOptions, claim *ap
 
 func (p *Provisioner) setDefaultDockerOptions(optionsMap map[string]interface{}, params map[string]string, dockerOptions map[string]interface{}, dockerClient *dockervol.DockerVolumePlugin) {
 	for k, v := range dockerOptions {
-		util.LogDebug.Printf("processing %s:%v", k, v)
+		log.Debugf("processing %s:%v", k, v)
 		_, ok := params[k]
 		if ok == false {
-			util.LogInfo.Printf("setting the docker option %s:%v", k, v)
+			log.Infof("setting the docker option %s:%v", k, v)
 			val := reflect.ValueOf(v)
 			optionsMap[k] = val.Interface()
 		}
 	}
-	util.LogDebug.Printf("optionsMap %v", optionsMap)
+	log.Debugf("optionsMap %v", optionsMap)
 }
 
 func limit(watched, parked *uint32, max uint32) {
@@ -721,7 +721,7 @@ func getClaimSizeForFactor(claim *api_v1.PersistentVolumeClaim, dockerClient *do
 					if dockerClient.ListOfStorageResourceOptions != nil &&
 						dockerClient.FactorForConversion != 0 {
 						sizeForDockerVolumeinGib = int(sizeInBytes) / dockerClient.FactorForConversion
-						util.LogDebug.Printf("claimSize=%d for size=%d bytes and factorForConversion=%d", sizeForDockerVolumeinGib, sizeInBytes, dockerClient.FactorForConversion)
+						log.Debugf("claimSize=%d for size=%d bytes and factorForConversion=%d", sizeForDockerVolumeinGib, sizeInBytes, dockerClient.FactorForConversion)
 						return sizeForDockerVolumeinGib
 					}
 				}
@@ -734,11 +734,11 @@ func getClaimSizeForFactor(claim *api_v1.PersistentVolumeClaim, dockerClient *do
 func (p *Provisioner) newDockerVolumePluginClient(provisionerName string) (*dockervol.DockerVolumePlugin, map[string]interface{}, error) {
 	driverName := strings.Split(provisionerName, "/")
 	if len(driverName) < 2 {
-		util.LogInfo.Printf("Unable to parse provisioner name %s.", provisionerName)
+		log.Infof("Unable to parse provisioner name %s.", provisionerName)
 		return nil, nil, fmt.Errorf("unable to parse provisioner name %s", provisionerName)
 	}
 	configPathName := fmt.Sprintf("%s%s/%s.json", flexVolumeBasePath, strings.Replace(provisionerName, "/", "~", 1), driverName[1])
-	util.LogDebug.Printf("looking for %s", configPathName)
+	log.Debugf("looking for %s", configPathName)
 	var (
 		socketFile                   = defaultSocketFile
 		strip                        = defaultStripValue
@@ -748,7 +748,7 @@ func (p *Provisioner) newDockerVolumePluginClient(provisionerName string) (*dock
 	)
 	c, err := jconfig.NewConfig(configPathName)
 	if err != nil {
-		util.LogInfo.Printf("Unable to process config at %s, %v.  Using defaults.", configPathName, err)
+		log.Infof("Unable to process config at %s, %v.  Using defaults.", configPathName, err)
 	} else {
 		socketFile, err = c.GetStringWithError("dockerVolumePluginSocketPath")
 		if err != nil {
@@ -768,17 +768,17 @@ func (p *Provisioner) newDockerVolumePluginClient(provisionerName string) (*dock
 		}
 		defaultOpts, err := c.GetMapSlice("defaultOptions")
 		if err == nil {
-			util.LogDebug.Printf("parsing defaultOptions %v", defaultOpts)
+			log.Debugf("parsing defaultOptions %v", defaultOpts)
 			optMap := make(map[string]interface{})
 
 			for _, values := range defaultOpts {
 				for k, v := range values {
 					optMap[k] = v
-					util.LogDebug.Printf("key %v value %v", k, optMap[k])
+					log.Debugf("key %v value %v", k, optMap[k])
 				}
 			}
 			dockerOpts = optMap
-			util.LogDebug.Printf("dockerOptions %v", dockerOpts)
+			log.Debugf("dockerOptions %v", dockerOpts)
 		}
 	}
 	options := &dockervol.Options{
@@ -796,7 +796,7 @@ func (p *Provisioner) waitForClasses() {
 	i := 0
 	for len(p.classStore.List()) < 1 {
 		if i > 29 {
-			util.LogInfo.Printf("No StorageClass found.  Unable to make progress.")
+			log.Infof("No StorageClass found.  Unable to make progress.")
 			i = 0
 		}
 		time.Sleep(time.Second)
@@ -835,21 +835,21 @@ func (c createDockerVol) Name() string {
 }
 
 func (c *createDockerVol) Run() (name interface{}, err error) {
-	util.LogDebug.Printf(">>>>>> Run createDockerVol with volume %s options %#v", c.requestedName, c.options)
-	defer util.LogDebug.Print("<<<<<< Run createDockerVol")
+	log.Debugf(">>>>>> Run createDockerVol with volume %s options %#v", c.requestedName, c.options)
+	defer log.Debug("<<<<<< Run createDockerVol")
 	c.returnedName, err = c.client.Create(c.requestedName, c.options)
 	if err != nil {
-		util.LogError.Printf("failed to create docker volume vol=%s, error=%s", c.requestedName, err.Error())
+		log.Errorf("failed to create docker volume vol=%s, error=%s", c.requestedName, err.Error())
 		return nil, err
 	}
-	util.LogInfo.Printf("created docker volume named %s", c.returnedName)
+	log.Infof("created docker volume named %s", c.returnedName)
 	name = c.returnedName
 	return name, err
 }
 
 func (c *createDockerVol) Rollback() (err error) {
-	util.LogDebug.Printf(">>>>>> Rollback createDockerVol called with %s", c.requestedName)
-	defer util.LogDebug.Print("<<<<<< Rollback createDockerVol")
+	log.Debugf(">>>>>> Rollback createDockerVol called with %s", c.requestedName)
+	defer log.Debug("<<<<<< Rollback createDockerVol")
 	if c.returnedName != "" {
 		err = c.client.Delete(c.returnedName, managerName)
 		if err != nil {
@@ -869,8 +869,8 @@ func (c deleteDockerVol) Name() string {
 }
 
 func (c *deleteDockerVol) Run() (name interface{}, err error) {
-	util.LogDebug.Printf(">>>>>> Run deleteDockerVol called with %s", c.name)
-	defer util.LogDebug.Print("<<<<<< Run deleteDockerVol")
+	log.Debugf(">>>>>> Run deleteDockerVol called with %s", c.name)
+	defer log.Debug("<<<<<< Run deleteDockerVol")
 	// slow down if there is a volume delete storm
 	time.Sleep(time.Duration(time.Second))
 	err = c.client.Delete(c.name, managerName)
@@ -895,8 +895,8 @@ func (c createPersistentVolume) Name() string {
 }
 
 func (c *createPersistentVolume) Run() (name interface{}, err error) {
-	util.LogDebug.Printf(">>>>>> Run createPersistentVolume called with %s", c.vol)
-	defer util.LogDebug.Print("<<<<<< Run createPersistentVolume")
+	log.Debugf(">>>>>> Run createPersistentVolume called with %s", c.vol)
+	defer log.Debug("<<<<<< Run createPersistentVolume")
 	pv, err := c.p.kubeClient.CoreV1().PersistentVolumes().Create(c.vol)
 	if err != nil {
 		c.p.eventRecorder.Event(pv, api_v1.EventTypeWarning, "CreatePersistentVolume", fmt.Sprintf("Failed to create pv %#v: %v", c.vol.Name, err))
@@ -910,8 +910,8 @@ func (c *createPersistentVolume) Run() (name interface{}, err error) {
 }
 
 func (c *createPersistentVolume) Rollback() (err error) {
-	util.LogDebug.Printf(">>>>>> Rollback createPersistentVolume called with %s", c.vol.Name)
-	defer util.LogDebug.Print("<<<<<< Rollback createPersistentVolume")
+	log.Debugf(">>>>>> Rollback createPersistentVolume called with %s", c.vol.Name)
+	defer log.Debug("<<<<<< Rollback createPersistentVolume")
 	return c.p.kubeClient.CoreV1().PersistentVolumes().Delete(c.vol.Name, &meta_v1.DeleteOptions{})
 }
 
@@ -925,8 +925,8 @@ func (d deletePersistentVolume) Name() string {
 }
 
 func (d *deletePersistentVolume) Run() (name interface{}, err error) {
-	util.LogDebug.Printf(">>>>>> Run deletePersistentVolume called with %s", d.vol.Name)
-	defer util.LogDebug.Print("<<<<<< Run deletePersistentVolume")
+	log.Debugf(">>>>>> Run deletePersistentVolume called with %s", d.vol.Name)
+	defer log.Debug("<<<<<< Run deletePersistentVolume")
 	err = d.p.kubeClient.CoreV1().PersistentVolumes().Delete(d.vol.Name, &meta_v1.DeleteOptions{})
 	if err != nil {
 		d.p.eventRecorder.Event(d.vol, api_v1.EventTypeWarning, "DeletePersistentVolume", fmt.Sprintf("Error Deleting pv %v %s", d.vol.Name, err.Error()))

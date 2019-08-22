@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hpe-storage/common-host-libs/util"
+	log "github.com/hpe-storage/common-host-libs/logger"
 	api_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -58,7 +58,7 @@ func (p *Provisioner) newClaimController() (cache.Store, cache.Controller) {
 func (p *Provisioner) addedClaim(t interface{}) {
 	claim, err := getPersistentVolumeClaim(t)
 	if err != nil {
-		util.LogError.Printf("Failed to get persistent volume claim from %v, %s", t, err.Error())
+		log.Errorf("Failed to get persistent volume claim from %v, %s", t, err.Error())
 		return
 	}
 	go p.processAddedClaim(claim)
@@ -67,7 +67,7 @@ func (p *Provisioner) addedClaim(t interface{}) {
 func (p *Provisioner) processAddedClaim(claim *api_v1.PersistentVolumeClaim) {
 	// is this a state we can do anything about
 	if claim.Status.Phase != api_v1.ClaimPending {
-		util.LogInfo.Printf("pvc %s was not in pending phase.  current phase=%s - skipping", claim.Name, claim.Status.Phase)
+		log.Infof("pvc %s was not in pending phase.  current phase=%s - skipping", claim.Name, claim.Status.Phase)
 		return
 	}
 
@@ -75,15 +75,15 @@ func (p *Provisioner) processAddedClaim(claim *api_v1.PersistentVolumeClaim) {
 	className := getClaimClassName(claim)
 	class, err := p.getClass(className)
 	if err != nil {
-		util.LogError.Printf("error getting class named %s for pvc %s. err=%v", className, claim.Name, err)
+		log.Errorf("error getting class named %s for pvc %s. err=%v", className, claim.Name, err)
 		return
 	}
 	if !strings.HasPrefix(class.Provisioner, FlexVolumeProvisioner) && !strings.HasPrefix(class.Provisioner, CsiProvisioner) {
-		util.LogInfo.Printf("class named %s in pvc %s did not refer to a supported provisioner (name must begin with %s or %s).  current provisioner=%s - skipping", className, claim.Name, CsiProvisioner, FlexVolumeProvisioner, class.Provisioner)
+		log.Infof("class named %s in pvc %s did not refer to a supported provisioner (name must begin with %s or %s).  current provisioner=%s - skipping", className, claim.Name, CsiProvisioner, FlexVolumeProvisioner, class.Provisioner)
 		return
 	}
 
-	util.LogInfo.Printf("processAddedClaim: provisioner:%s pvc:%s  class:%s", class.Provisioner, claim.Name, className)
+	log.Infof("processAddedClaim: provisioner:%s pvc:%s  class:%s", class.Provisioner, claim.Name, className)
 	p.addMessageChan(fmt.Sprintf("%s", claim.UID), nil)
 	p.provisionVolume(claim, class)
 }
@@ -91,10 +91,10 @@ func (p *Provisioner) processAddedClaim(claim *api_v1.PersistentVolumeClaim) {
 func (p *Provisioner) updatedClaim(oldT interface{}, newT interface{}) {
 	claim, err := getPersistentVolumeClaim(newT)
 	if err != nil {
-		util.LogError.Printf("Oops - %s\n", err.Error())
+		log.Errorf("Oops - %s\n", err.Error())
 		return
 	}
-	util.LogDebug.Printf("updatedClaim: pvc %s current phase=%s", claim.Name, claim.Status.Phase)
+	log.Debugf("updatedClaim: pvc %s current phase=%s", claim.Name, claim.Status.Phase)
 	go p.sendUpdate(claim)
 }
 
@@ -127,8 +127,8 @@ func getPersistentVolumeClaim(t interface{}) (*api_v1.PersistentVolumeClaim, err
 }
 
 func (p *Provisioner) getClaimFromPVCName(nameSpace, claimName string) (*api_v1.PersistentVolumeClaim, error) {
-	util.LogDebug.Printf(">>>>> getClaimFromPVCNames called with %s/%s", nameSpace, claimName)
-	defer util.LogDebug.Printf("<<<<< getClaimFromPVCName")
+	log.Debugf(">>>>> getClaimFromPVCNames called with %s/%s", nameSpace, claimName)
+	defer log.Debug("<<<<< getClaimFromPVCName")
 	if p.claimsStore == nil {
 		return nil, fmt.Errorf("requested pvc %s/%s was not found because claimStore was nil", nameSpace, claimName)
 	}
@@ -137,27 +137,27 @@ func (p *Provisioner) getClaimFromPVCName(nameSpace, claimName string) (*api_v1.
 	}
 	claimInterface, found, err := p.claimsStore.GetByKey(nameSpace + "/" + claimName)
 	if err != nil {
-		util.LogError.Printf("Error to retrieve pvc %s/%s : %s", nameSpace, claimName, err.Error())
+		log.Errorf("Error to retrieve pvc %s/%s : %s", nameSpace, claimName, err.Error())
 		return nil, fmt.Errorf("Error to retrieve pvc %s/%s : %s", nameSpace, claimName, err.Error())
 	}
 	if !found {
-		util.LogError.Printf("requested pvc %s/%s was not found", nameSpace, claimName)
+		log.Errorf("requested pvc %s/%s was not found", nameSpace, claimName)
 		return nil, fmt.Errorf("requested pvc %s/%s was not found", nameSpace, claimName)
 	}
 	var claim *api_v1.PersistentVolumeClaim
 	claim, err = getPersistentVolumeClaim(claimInterface)
 	if err != nil {
-		util.LogError.Printf("requested pvc %s/%s was not found : %s", nameSpace, claimName, err.Error())
+		log.Errorf("requested pvc %s/%s was not found : %s", nameSpace, claimName, err.Error())
 		return nil, fmt.Errorf("requested pvc %s/%s was not found : %s", nameSpace, claimName, err.Error())
 	}
-	util.LogDebug.Printf("claim found namespace :%s name: %s", claim.Namespace, claim.Name)
+	log.Debugf("claim found namespace :%s name: %s", claim.Namespace, claim.Name)
 
 	return claim, nil
 }
 
 func (p *Provisioner) getClaimOverrideOptions(claim *api_v1.PersistentVolumeClaim, overrides []string, optionsMap map[string]interface{}, provisioner string) (map[string]interface{}, error) {
-	util.LogDebug.Printf(">>>> getClaimOverrideOptions for %s", provisioner)
-	defer util.LogDebug.Printf("<<<<< getClaimOverrideOptions")
+	log.Debugf(">>>> getClaimOverrideOptions for %s", provisioner)
+	defer log.Debug("<<<<< getClaimOverrideOptions")
 	provisionerName := provisioner
 	for _, override := range overrides {
 		for key, annotation := range claim.Annotations {
@@ -165,12 +165,12 @@ func (p *Provisioner) getClaimOverrideOptions(claim *api_v1.PersistentVolumeClai
 				if valOpt, ok := optionsMap[override]; ok {
 					if override == "size" || override == "sizeInGiB" {
 						// do not allow  override of size and sizeInGiB
-						util.LogDebug.Printf("override of size and sizeInGiB is not permitted, default to claim capacity of %v", valOpt)
+						log.Debugf("override of size and sizeInGiB is not permitted, default to claim capacity of %v", valOpt)
 						p.eventRecorder.Event(claim, api_v1.EventTypeNormal, "ProvisionStorage", fmt.Errorf("override of size and sizeInGiB is not permitted, default to claim capacity of %v", valOpt).Error())
 						continue
 					}
 				}
-				util.LogDebug.Printf("adding key: %v with override value: %v", override, annotation)
+				log.Debugf("adding key: %v with override value: %v", override, annotation)
 				optionsMap[override] = annotation
 			}
 		}
@@ -199,7 +199,7 @@ func (p *Provisioner) getClaimNameSpace(claim *api_v1.PersistentVolumeClaim) str
 	if claim != nil && claim.Namespace != "" {
 		nameSpace = claim.Namespace
 	}
-	util.LogDebug.Printf("namespace of the claim %s is : %s", claim.Name, nameSpace)
+	log.Debugf("namespace of the claim %s is : %s", claim.Name, nameSpace)
 	return nameSpace
 }
 
@@ -211,10 +211,10 @@ func (p *Provisioner) getPVFromPVCAnnotation(claim *api_v1.PersistentVolumeClaim
 	}
 
 	namespace := p.getClaimNameSpace(claim)
-	util.LogDebug.Printf("%s%s: %s was found in claim annotations", provisioner, cloneOfPVC, pvcToClone)
+	log.Debugf("%s%s: %s was found in claim annotations", provisioner, cloneOfPVC, pvcToClone)
 
 	pvName, err := p.getVolumeNameFromClaimName(namespace, pvcToClone)
-	util.LogDebug.Printf("pvc %s/%s maps to pv %s", namespace, pvcToClone, pvName)
+	log.Debugf("pvc %s/%s maps to pv %s", namespace, pvcToClone, pvName)
 	if err != nil {
 		return "", fmt.Errorf("unable to retrieve pvc %s/%s : %s", namespace, pvcToClone, err.Error())
 	}
@@ -225,8 +225,8 @@ func (p *Provisioner) getPVFromPVCAnnotation(claim *api_v1.PersistentVolumeClaim
 }
 
 func (p *Provisioner) checkClaimDataSorce(claim *api_v1.PersistentVolumeClaim) (bool, error) {
-	util.LogDebug.Printf(">>>>> checkClaimDataSorce called for PVC %s", claim.Name)
-	defer util.LogDebug.Printf("<<<<<< checkClaimDataSorce")
+	log.Debugf(">>>>> checkClaimDataSorce called for PVC %s", claim.Name)
+	defer log.Debug("<<<<<< checkClaimDataSorce")
 	if claim.Spec.DataSource == nil {
 		return false, nil
 	}

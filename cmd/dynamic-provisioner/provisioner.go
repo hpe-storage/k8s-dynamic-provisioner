@@ -24,7 +24,7 @@ import (
 	"syscall"
 
 	csi_spec "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/hpe-storage/common-host-libs/util"
+	log "github.com/hpe-storage/common-host-libs/logger"
 	crd_client "github.com/hpe-storage/k8s-custom-resources/pkg/client/clientset/versioned"
 	"github.com/hpe-storage/k8s-dynamic-provisioner/pkg/provisioner"
 	snap_client "github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned"
@@ -33,12 +33,14 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	csi_client "k8s.io/csi-api/pkg/client/clientset/versioned"
+
 	"k8s.io/klog"
 )
 
 var (
 	// init to empty as we always want to get this from env variable
 	csiEndpoint = flag.String("endpoint", "", "Address of the CSI driver socket.")
+	logFilePath = "/var/log/hpe-dynamic-provisioner.log"
 )
 
 // nolint: gocyclo
@@ -104,12 +106,12 @@ func main() {
 	if provisioner.CsiEndpoint != "" {
 		csiDriverClient, err = provisioner.GetCsiDriverClient()
 		if err != nil {
-			util.LogError.Printf("Error getting csi driver client for %s - %s", provisioner.CsiProvisioner, err.Error())
+			log.Errorf("Error getting csi driver client for %s - %s", provisioner.CsiProvisioner, err.Error())
 			os.Exit(1)
 		}
 	}
 
-	util.OpenLog(true)
+	log.InitLogging(logFilePath, &log.LogParams{Level: "debug"}, false)
 
 	stop := make(chan struct{})
 
@@ -143,12 +145,12 @@ func main() {
 		syscall.SIGSEGV)
 	go func() {
 		s := <-sigc
-		util.LogError.Fatalf("Exiting due to signal notification.  Signal was %v.", s.String())
+		log.Fatalf("Exiting due to signal notification.  Signal was %v.", s.String())
 		return
 	}()
 	select {
 	case msg := <-stop:
-		util.LogError.Printf("error in provisioner: %#v", msg)
+		log.Errorf("error in provisioner: %#v", msg)
 	}
 	<-stop
 }
