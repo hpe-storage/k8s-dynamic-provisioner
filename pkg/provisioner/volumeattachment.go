@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	csi_spec "github.com/container-storage-interface/spec/lib/go/csi"
+	log "github.com/hpe-storage/common-host-libs/logger"
 	"github.com/hpe-storage/common-host-libs/model"
-	"github.com/hpe-storage/common-host-libs/util"
 	api_v1 "k8s.io/api/core/v1"
 	storage_v1 "k8s.io/api/storage/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +55,7 @@ func (p *Provisioner) newVolumeAttachmentController() (cache.Store, cache.Contro
 func (p *Provisioner) addedVolumeAttachments(t interface{}) {
 	va, err := getVolumeAttachment(t)
 	if err != nil {
-		util.LogError.Printf("unable to process va add - %v,  %s", t, err.Error())
+		log.Errorf("unable to process va add - %v,  %s", t, err.Error())
 	}
 	go p.processVAAddEvent(va)
 }
@@ -64,7 +64,7 @@ func (p *Provisioner) addedVolumeAttachments(t interface{}) {
 func (p *Provisioner) updatedVolumeAttachments(oldT interface{}, newT interface{}) {
 	va, err := getVolumeAttachment(newT)
 	if err != nil {
-		util.LogError.Printf("unable to process va update - %v,  %s", newT, err.Error())
+		log.Errorf("unable to process va update - %v,  %s", newT, err.Error())
 	}
 	go p.processVAUpdateEvent(va)
 }
@@ -73,7 +73,7 @@ func (p *Provisioner) updatedVolumeAttachments(oldT interface{}, newT interface{
 func (p *Provisioner) deletedVolumeAttachments(t interface{}) {
 	va, err := getVolumeAttachment(t)
 	if err != nil {
-		util.LogError.Printf("unable to process va delete - %v,  %s", t, err.Error())
+		log.Errorf("unable to process va delete - %v,  %s", t, err.Error())
 	}
 	go p.processVADeleteEvent(va)
 }
@@ -91,59 +91,59 @@ func getVolumeAttachment(t interface{}) (*storage_v1.VolumeAttachment, error) {
 }
 
 func (p *Provisioner) processVAUpdateEvent(va *storage_v1.VolumeAttachment) error {
-	util.LogInfo.Printf(">>>>>> processVAUpdateEvent called")
-	defer util.LogInfo.Printf("<<<<<< processVAUpdateEvent")
+	log.Info(">>>>>> processVAUpdateEvent called")
+	defer log.Info("<<<<<< processVAUpdateEvent")
 	//TODO : check for updates
 	return nil
 }
 
 func (p *Provisioner) processVADeleteEvent(va *storage_v1.VolumeAttachment) error {
-	util.LogInfo.Printf(">>>>>> processVADeleteEvent called")
-	defer util.LogInfo.Printf("<<<<<< processVADeleteEvent")
+	log.Info(">>>>>> processVADeleteEvent called")
+	defer log.Info("<<<<<< processVADeleteEvent")
 	err := p.processDetach(va)
 	if err != nil {
-		util.LogDebug.Printf("err=%s", err.Error())
+		log.Debugf("err=%s", err.Error())
 		return nil
 	}
-	util.LogDebug.Printf("deleting va %s", va.Name)
+	log.Debugf("deleting va %s", va.Name)
 	err = p.kubeClient.StorageV1().VolumeAttachments().Delete(va.Name, &meta_v1.DeleteOptions{})
 	if err != nil {
-		util.LogError.Printf(err.Error())
+		log.Error(err.Error())
 		return nil
 	}
 	return nil
 }
 
 func (p *Provisioner) processVAAddEvent(va *storage_v1.VolumeAttachment) error {
-	util.LogInfo.Printf(">>>>>> processVAAddEvent called")
-	defer util.LogInfo.Printf("<<<<<< processVAAddEvent")
+	log.Info(">>>>>> processVAAddEvent called")
+	defer log.Info("<<<<<< processVAAddEvent")
 	// if the VA is already in deletion state, we can't process it for addition
 	if va.DeletionTimestamp != nil {
 		return fmt.Errorf("va %s DeletionTimestamp is set to %v, ignoring Attach", va.Name, va.DeletionTimestamp)
 	}
-	util.LogInfo.Printf("va %s has been created for attach.  current phase=%v", va.Name, va.Status)
+	log.Infof("va %s has been created for attach.  current phase=%v", va.Name, va.Status)
 	err := p.processAttach(va)
 	if err != nil {
-		util.LogDebug.Printf("err=%s", err.Error())
+		log.Debugf("err=%s", err.Error())
 		return err
 	}
 	return nil
 }
 
 func (p *Provisioner) processDetach(va *storage_v1.VolumeAttachment) error {
-	util.LogInfo.Printf(">>>>>> processDetach called")
-	defer util.LogInfo.Printf("<<<<<< processDetach")
+	log.Info(">>>>>> processDetach called")
+	defer log.Info("<<<<<< processDetach")
 	va, err := p.executeDetach(va)
 	if err != nil {
 		return err
 	}
-	util.LogDebug.Printf("va %s after detach is %#v", va.Name, va)
+	log.Debugf("va %s after detach is %#v", va.Name, va)
 	return nil
 }
 
 func (p *Provisioner) processAttach(va *storage_v1.VolumeAttachment) error {
-	util.LogInfo.Printf(">>>>>> processAttach called")
-	defer util.LogInfo.Printf("<<<<<< processAttach")
+	log.Info(">>>>>> processAttach called")
+	defer log.Info("<<<<<< processAttach")
 	if va.Status.Attached {
 		// volume is attached nothing to do
 		return nil
@@ -151,21 +151,21 @@ func (p *Provisioner) processAttach(va *storage_v1.VolumeAttachment) error {
 	// executeAttach  volumeattachment attach workflow
 	va, metadata, err := p.executeAttach(va)
 	if err != nil {
-		util.LogDebug.Printf("err=%s", err.Error())
+		log.Debugf("err=%s", err.Error())
 		return err
 	}
-	util.LogInfo.Printf("Attached %q", va.Name)
+	log.Infof("Attached %q", va.Name)
 	// update VA Status
 	if _, err := p.markAsAttached(va, metadata); err != nil {
 		return fmt.Errorf("failed to mark va %s as attached: %s", va.Name, err.Error())
 	}
-	util.LogInfo.Printf("Fully attached %q", va.Name)
+	log.Infof("Fully attached %q", va.Name)
 	return nil
 }
 
 func (p *Provisioner) getPVFromVA(va *storage_v1.VolumeAttachment) (*api_v1.PersistentVolume, error) {
-	util.LogDebug.Printf(">>>>>> getPVFromVA called")
-	defer util.LogDebug.Printf("<<<<<< getPVFromVA")
+	log.Debug(">>>>>> getPVFromVA called")
+	defer log.Debug("<<<<<< getPVFromVA")
 	pvName := *va.Spec.Source.PersistentVolumeName
 	pvInterface, found, err := p.pvStore.GetByKey(pvName)
 	if err != nil {
@@ -182,8 +182,8 @@ func (p *Provisioner) getPVFromVA(va *storage_v1.VolumeAttachment) (*api_v1.Pers
 }
 
 func (p *Provisioner) executeDetach(va *storage_v1.VolumeAttachment) (*storage_v1.VolumeAttachment, error) {
-	util.LogInfo.Printf(">>>>>> executeDetach called")
-	defer util.LogInfo.Printf("<<<<<< executeDetach")
+	log.Info(">>>>>> executeDetach called")
+	defer log.Info("<<<<<< executeDetach")
 	if va.Spec.Source.PersistentVolumeName == nil {
 		return va, fmt.Errorf("VolumeAttachment.spec.persistentVolumeName is empty")
 	}
@@ -218,7 +218,7 @@ func (p *Provisioner) executeDetach(va *storage_v1.VolumeAttachment) (*storage_v
 		Secrets:  secrets,
 	}
 
-	util.LogDebug.Printf("ControllerUnpublishVolumeRequest for volume %s = %#v", pv.Name, controllerUnpublishReq)
+	log.Debugf("ControllerUnpublishVolumeRequest for volume %s = %#v", pv.Name, controllerUnpublishReq)
 
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
@@ -232,14 +232,14 @@ func (p *Provisioner) executeDetach(va *storage_v1.VolumeAttachment) (*storage_v
 		return va, fmt.Errorf("could not mark as detached: %s", err)
 	}
 
-	util.LogInfo.Printf("va %s is Detached", va.Name)
+	log.Infof("va %s is Detached", va.Name)
 	return va, nil
 }
 
 // nolint : gocyclo
 func (p *Provisioner) executeAttach(va *storage_v1.VolumeAttachment) (*storage_v1.VolumeAttachment, map[string]string, error) {
-	util.LogDebug.Printf(">>>>>> executeAttach called")
-	defer util.LogDebug.Printf("<<<<<< executeAttach")
+	log.Debug(">>>>>> executeAttach called")
+	defer log.Debug("<<<<<< executeAttach")
 	if va.Spec.Source.PersistentVolumeName == nil {
 		return va, nil, fmt.Errorf("VolumeAttachment.Spec.Source.PersistentVolumeName is empty")
 	}
@@ -281,7 +281,7 @@ func (p *Provisioner) executeAttach(va *storage_v1.VolumeAttachment) (*storage_v
 	if err != nil {
 		return va, nil, err
 	}
-	util.LogDebug.Printf("getVolumeCapabililty = %#v", volCap)
+	log.Debugf("getVolumeCapabililty = %#v", volCap)
 
 	controllerPublishReq := &csi_spec.ControllerPublishVolumeRequest{
 		VolumeId:         pv.Spec.CSI.VolumeHandle,
@@ -292,7 +292,7 @@ func (p *Provisioner) executeAttach(va *storage_v1.VolumeAttachment) (*storage_v
 		VolumeContext:    pv.Spec.CSI.VolumeAttributes,
 	}
 
-	util.LogDebug.Printf("ControllerPublishVolumeRequest for volume %s = %#v", pv.Name, controllerPublishReq)
+	log.Debugf("ControllerPublishVolumeRequest for volume %s = %#v", pv.Name, controllerPublishReq)
 
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
@@ -301,7 +301,7 @@ func (p *Provisioner) executeAttach(va *storage_v1.VolumeAttachment) (*storage_v
 	if err != nil {
 		return va, nil, err
 	}
-	util.LogInfo.Printf("ControllerPublishVolumeResponse for volume %s is %#v", pv.Name, publishInfoRsp)
+	log.Infof("ControllerPublishVolumeResponse for volume %s is %#v", pv.Name, publishInfoRsp)
 	if publishInfoRsp.PublishContext == nil {
 		return va, nil, fmt.Errorf("unable to retrieve PublishContext from ControllePublishVolume for %s", pv.Name)
 	}
@@ -314,8 +314,8 @@ func isPvModeBlock(pv *api_v1.PersistentVolume) bool {
 }
 
 func (p *Provisioner) getVolumeCapabililty(pv *api_v1.PersistentVolume) (*csi_spec.VolumeCapability, error) {
-	util.LogDebug.Printf(">>>>>> getVolumeCapabililty called")
-	defer util.LogDebug.Printf("<<<<<< getVolumeCapabililty")
+	log.Debug(">>>>>> getVolumeCapabililty called")
+	defer log.Debug("<<<<<< getVolumeCapabililty")
 
 	// If block access type, then return block volume capability
 	if isPvModeBlock(pv) {
@@ -329,7 +329,7 @@ func (p *Provisioner) getVolumeCapabililty(pv *api_v1.PersistentVolume) (*csi_sp
 	// Else mount access type, then return mount access capability
 	fsType := pv.Spec.CSI.FSType
 	if fsType == "" {
-		util.LogDebug.Print("Using default filesystem: ", defaultFSType)
+		log.Debug("Using default filesystem: ", defaultFSType)
 		fsType = defaultFSType
 	}
 	return &csi_spec.VolumeCapability{
@@ -342,8 +342,8 @@ func (p *Provisioner) getVolumeCapabililty(pv *api_v1.PersistentVolume) (*csi_sp
 
 // getNodeIDFromNode returns nodeID string from node annotations.
 func (p *Provisioner) getNodeIDFromNode(node *api_v1.Node) (string, error) {
-	util.LogDebug.Printf(">>>>>> getNodeIDFromNode")
-	defer util.LogDebug.Printf("<<<<<< getNodeIDFromNode")
+	log.Debug(">>>>>> getNodeIDFromNode")
+	defer log.Debug("<<<<<< getNodeIDFromNode")
 	nodeIDJSON, ok := node.Annotations[nodeIDAnnotation]
 	if !ok {
 		return "", fmt.Errorf("node %q has no NodeID annotation", node.Name)
@@ -362,8 +362,8 @@ func (p *Provisioner) getNodeIDFromNode(node *api_v1.Node) (string, error) {
 }
 
 func (p *Provisioner) getNodeID(va *storage_v1.VolumeAttachment) (string, error) {
-	util.LogDebug.Printf(">>>>>> getNodeID")
-	defer util.LogDebug.Printf("<<<<<< getNodeID")
+	log.Debug(">>>>>> getNodeID")
+	defer log.Debug("<<<<<< getNodeID")
 	if va.Spec.NodeName == "" {
 		return "", fmt.Errorf("no NodeName present in VA Spec for %s", va.Name)
 	}
@@ -371,19 +371,19 @@ func (p *Provisioner) getNodeID(va *storage_v1.VolumeAttachment) (string, error)
 	nodeInfo, err := p.csiClient.CsiV1alpha1().CSINodeInfos().Get(va.Spec.NodeName, meta_v1.GetOptions{})
 	if err == nil {
 		if nodeID, found := p.getNodeIDFromNodeInfo(nodeInfo); found {
-			util.LogInfo.Printf("Found NodeID %s in CSINodeInfo %s", nodeID, va.Spec.NodeName)
+			log.Infof("Found NodeID %s in CSINodeInfo %s", nodeID, va.Spec.NodeName)
 			return nodeID, nil
 		}
 		// Fall through to Node annotation.
 	} else {
 		// Can't get CSINodeInfo, Maybe because of feature gate disabled for CSINodeInfos, fall through to Node annotation.
-		util.LogInfo.Printf("Can't get CSINodeInfo %s: %s", va.Spec.NodeName, err.Error())
+		log.Infof("Can't get CSINodeInfo %s: %s", va.Spec.NodeName, err.Error())
 	}
 
 	// Check Node annotation if it contains the node-id which matches the VA Node name
 	node, err := p.kubeClient.CoreV1().Nodes().Get(va.Spec.NodeName, meta_v1.GetOptions{})
 	if err == nil {
-		util.LogDebug.Printf("retrieved Node %#v for VA %s", node, va.Name)
+		log.Debugf("retrieved Node %#v for VA %s", node, va.Name)
 		return p.getNodeIDFromNode(node)
 	}
 
@@ -409,17 +409,17 @@ func (p *Provisioner) getNodeIDFromNodeInfo(nodeInfo *csi_v1_alpha1.CSINodeInfo)
 }
 
 func (p *Provisioner) getNodeInfoFromHPENodeInfo(nodeID string) (string, error) {
-	util.LogDebug.Printf(">>>>>> getNodeInfoFromHPENodeInfo from node ID %s", nodeID)
-	defer util.LogDebug.Printf("<<<<<< getNodeInfoFromHPENodeInfo")
+	log.Debugf(">>>>>> getNodeInfoFromHPENodeInfo from node ID %s", nodeID)
+	defer log.Debugf("<<<<<< getNodeInfoFromHPENodeInfo")
 
 	nodeInfoList, err := p.crdClient.StorageV1().HPENodeInfos().List(meta_v1.ListOptions{})
 	if err != nil {
 		return "", err
 	}
-	util.LogDebug.Printf("Found the following HPE Node Info objects: %v", nodeInfoList)
+	log.Debugf("Found the following HPE Node Info objects: %v", nodeInfoList)
 
 	for _, nodeInfo := range nodeInfoList.Items {
-		util.LogDebug.Printf("Processing node info %v", nodeInfo)
+		log.Debugf("Processing node info %v", nodeInfo)
 
 		if nodeInfo.Spec.UUID == nodeID {
 			iqns := make([]*string, len(nodeInfo.Spec.IQNs))
@@ -454,8 +454,8 @@ func (p *Provisioner) getNodeInfoFromHPENodeInfo(nodeID string) (string, error) 
 }
 
 func (p *Provisioner) markAsAttached(va *storage_v1.VolumeAttachment, metadata map[string]string) (*storage_v1.VolumeAttachment, error) {
-	util.LogInfo.Printf(">>>>>> markAsAttached called")
-	defer util.LogDebug.Printf("<<<<<<< markAsAttached")
+	log.Debug(">>>>>> markAsAttached called")
+	defer log.Debug("<<<<<<< markAsAttached")
 	clone := va.DeepCopy()
 	clone.Status.Attached = true
 	clone.Status.AttachmentMetadata = metadata
@@ -463,16 +463,16 @@ func (p *Provisioner) markAsAttached(va *storage_v1.VolumeAttachment, metadata m
 	// volumeattachment/status create/update capability is needed
 	newVA, err := p.kubeClient.StorageV1().VolumeAttachments().UpdateStatus(clone)
 	if err != nil {
-		util.LogError.Printf("err = %s", err.Error())
+		log.Errorf("err = %s", err.Error())
 		return va, err
 	}
-	util.LogInfo.Printf("Marked as attached %q Status :%v", newVA.Name, newVA.Status)
+	log.Infof("Marked as attached %q Status :%v", newVA.Name, newVA.Status)
 	return newVA, nil
 }
 
 func (p *Provisioner) markAsDetached(va *storage_v1.VolumeAttachment) (*storage_v1.VolumeAttachment, error) {
-	util.LogInfo.Printf(">>>>>> markAsDetached called")
-	defer util.LogDebug.Printf("<<<<<<< markAsDetached")
+	log.Debug(">>>>>> markAsDetached called")
+	defer log.Debug("<<<<<<< markAsDetached")
 	// get the latest state of the va before updating. It could be Detached by the time it reaches here
 	updatedVA, _ := p.kubeClient.StorageV1().VolumeAttachments().Get(va.Name, meta_v1.GetOptions{})
 	if updatedVA == nil {
@@ -480,10 +480,10 @@ func (p *Provisioner) markAsDetached(va *storage_v1.VolumeAttachment) (*storage_
 		return va, nil
 	}
 	if !updatedVA.Status.Attached {
-		util.LogInfo.Printf("Already fully detached %q", va.Name)
+		log.Infof("Already fully detached %q", va.Name)
 		return va, nil
 	}
-	util.LogDebug.Printf("Marking %q as detached", va.Name)
+	log.Debugf("Marking %q as detached", va.Name)
 	clone := updatedVA.DeepCopy()
 	clone.Status.Attached = false
 	clone.Status.AttachmentMetadata = nil

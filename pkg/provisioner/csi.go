@@ -13,7 +13,7 @@ import (
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
 	"github.com/kubernetes-csi/csi-lib-utils/rpc"
 
-	"github.com/hpe-storage/common-host-libs/util"
+	log "github.com/hpe-storage/common-host-libs/logger"
 	api_v1 "k8s.io/api/core/v1"
 	storage_v1 "k8s.io/api/storage/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,10 +89,10 @@ func (c *createCsiVol) Run() (name interface{}, err error) {
 	defer cancel()
 	c.createVolumeResponse, err = c.client.CreateVolume(ctx, c.createRequest)
 	if err != nil {
-		util.LogError.Printf("failed to create csi volume %s, error=%s", c.requestedName, err.Error())
+		log.Errorf("failed to create csi volume %s, error=%s", c.requestedName, err.Error())
 		return nil, err
 	}
-	util.LogInfo.Printf("created csi volume %v", c.createVolumeResponse)
+	log.Infof("created csi volume %v", c.createVolumeResponse)
 	name, ok := c.createVolumeResponse.Volume.VolumeContext["name"]
 	if !ok {
 		return nil, fmt.Errorf("unable to retrieve the name from csi volume %v", c.createVolumeResponse)
@@ -109,7 +109,7 @@ func (c *createCsiVol) Run() (name interface{}, err error) {
 		fstype, ok := c.createRequest.Parameters[csiFsTypeParameter]
 		if !ok {
 			// the fstype parameter is not present, default to xfs
-			util.LogDebug.Printf("%s is not set. Setting the fstype to %s", csiFsTypeParameter, defaultFSType)
+			log.Debugf("%s is not set. Setting the fstype to %s", csiFsTypeParameter, defaultFSType)
 			fstype = defaultFSType
 		}
 		c.pv.Spec.PersistentVolumeSource.CSI.FSType = fstype
@@ -122,7 +122,7 @@ func (c *createCsiVol) Run() (name interface{}, err error) {
 	if respCap < volSizeBytes {
 		capErr := fmt.Errorf("created volume capacity %v less than requested capacity %v", respCap, volSizeBytes)
 		// Log error and invoke volume delete
-		util.LogError.Printf("Volume %s with id %s created with insufficient size. So, deleting it",
+		log.Errorf("Volume %s with id %s created with insufficient size. So, deleting it",
 			c.createRequest.GetName(), c.createVolumeResponse.GetVolume().GetVolumeId())
 		delReq := &csi_spec.DeleteVolumeRequest{
 			VolumeId: c.createVolumeResponse.GetVolume().GetVolumeId(),
@@ -159,7 +159,7 @@ func (d *deleteCsiVol) Run() (name interface{}, err error) {
 	defer cancel()
 	d.deleteVolumeResponse, err = d.client.DeleteVolume(ctx, d.deleteRequest)
 	if err != nil {
-		util.LogError.Printf("failed to delete csi volume %s, error=%s", d.requestedName, err.Error())
+		log.Errorf("failed to delete csi volume %s, error=%s", d.requestedName, err.Error())
 	}
 	return nil, err
 }
@@ -170,17 +170,17 @@ func (d *deleteCsiVol) Rollback() (err error) {
 
 // GetCsiDriverClient : get the csiDriverClient
 func GetCsiDriverClient() (csi_spec.ControllerClient, error) {
-	util.LogDebug.Print(">>>> GetCsiDriverClient called")
-	defer util.LogDebug.Print("<<<<<< GetCsiDriverClient")
+	log.Debug(">>>> GetCsiDriverClient called")
+	defer log.Debug("<<<<<< GetCsiDriverClient")
 	csiConn, err := connection.Connect(CsiEndpoint)
 	if err != nil {
-		util.LogError.Printf("unable to connect to CsiEndpoint %s err=%s", CsiEndpoint, err.Error())
+		log.Errorf("unable to connect to CsiEndpoint %s err=%s", CsiEndpoint, err.Error())
 		return nil, err
 	}
 
 	err = rpc.ProbeForever(csiConn, csiTimeout)
 	if err != nil {
-		util.LogError.Printf(err.Error())
+		log.Errorf(err.Error())
 		return nil, err
 	}
 
@@ -189,7 +189,7 @@ func GetCsiDriverClient() (csi_spec.ControllerClient, error) {
 	// Find driver name and validate it is csiProvisioner
 	csiDriver, err := rpc.GetDriverName(ctx, csiConn)
 	if err != nil {
-		util.LogError.Printf(err.Error())
+		log.Errorf(err.Error())
 		return nil, err
 	}
 	if csiDriver != CsiProvisioner {
@@ -309,8 +309,8 @@ func isPvcModeBlock(claim *api_v1.PersistentVolumeClaim) bool {
 }
 
 func (p *Provisioner) getCredentials(ref *api_v1.SecretReference) (map[string]string, error) {
-	util.LogDebug.Printf(">>>>>>>> getCredentials called")
-	defer util.LogDebug.Printf("<<<<<<< getCredentials")
+	log.Debug(">>>>>>>> getCredentials called")
+	defer log.Debug("<<<<<<< getCredentials")
 	if ref == nil {
 		return nil, nil
 	}
@@ -342,14 +342,14 @@ func (p *Provisioner) getAccessTypeMount(fsType string, mountFlags []string) *cs
 
 // getVolumeCapabilities constructs volume capabilities with appropriate volume access type
 func (p *Provisioner) getVolumeCapabilities(class *storage_v1.StorageClass, claim *api_v1.PersistentVolumeClaim) ([]*csi_spec.VolumeCapability, error) {
-	util.LogDebug.Printf(">>>>> getVolumeCapabilities, claim: %+v", claim)
-	defer util.LogDebug.Printf("<<<<<<< getVolumeCapabilities")
+	log.Debugf(">>>>> getVolumeCapabilities, claim: %+v", claim)
+	defer log.Debug("<<<<<<< getVolumeCapabilities")
 
 	volumeCaps := make([]*csi_spec.VolumeCapability, 0)
 
 	// Check if block access claim
 	if isPvcModeBlock(claim) {
-		util.LogDebug.Print("Requested for Block volume access")
+		log.Debug("Requested for Block volume access")
 
 		// Set access type as 'block' for each supported access mode
 		for _, accessMode := range defaultVolAccessModes {
@@ -362,7 +362,7 @@ func (p *Provisioner) getVolumeCapabilities(class *storage_v1.StorageClass, clai
 	}
 
 	// Else, Filesystem/Mount access claim
-	util.LogDebug.Print("Requested for Mount volume access")
+	log.Debug("Requested for Mount volume access")
 
 	// Get the filesystem type if specified, else use default
 	fsType := ""
@@ -370,7 +370,7 @@ func (p *Provisioner) getVolumeCapabilities(class *storage_v1.StorageClass, clai
 		fsType = val
 	}
 	if fsType == "" {
-		util.LogDebug.Print("Using default filesystem: ", defaultFSType)
+		log.Debug("Using default filesystem: ", defaultFSType)
 		fsType = defaultFSType
 	}
 
@@ -386,8 +386,8 @@ func (p *Provisioner) getVolumeCapabilities(class *storage_v1.StorageClass, clai
 
 // Check if all PV access modes specified in the PVC are supported.
 func (p *Provisioner) validatePvAccessModes(pvAccessModes []api_v1.PersistentVolumeAccessMode) error {
-	util.LogDebug.Printf(">>>>> validatePvAccessModes, pvAccessModes: %v", pvAccessModes)
-	defer util.LogDebug.Printf("<<<<< validatePvAccessModes")
+	log.Debugf(">>>>> validatePvAccessModes, pvAccessModes: %v", pvAccessModes)
+	defer log.Debug("<<<<< validatePvAccessModes")
 
 	// Only 'ReadWriteOnly' is supported by the CSI driver for now
 	for _, pvAccessMode := range pvAccessModes {
@@ -396,29 +396,29 @@ func (p *Provisioner) validatePvAccessModes(pvAccessModes []api_v1.PersistentVol
 			   - api_v1.ReadWriteMany
 			   - api_v1.ReadOnlyMany
 			*/
-			util.LogError.Printf("Found unsupported PV AccessMode: %v", pvAccessMode)
+			log.Errorf("Found unsupported PV AccessMode: %v", pvAccessMode)
 			return fmt.Errorf("Found unsupported PV AccessMode '%v'", pvAccessMode)
 		}
 	}
 	return nil
 }
 func (p *Provisioner) buildCsiVolumeCreateRequest(volName string, class *storage_v1.StorageClass, claim *api_v1.PersistentVolumeClaim, csiCredentials map[string]string) (*csi_spec.CreateVolumeRequest, error) {
-	util.LogDebug.Printf(">>>>> buildCsiVolumeCreateRequest for %s", volName)
-	defer util.LogDebug.Print("<<<<< buildCsiVolumeCreateRequest")
+	log.Debugf(">>>>> buildCsiVolumeCreateRequest for %s", volName)
+	defer log.Debug("<<<<< buildCsiVolumeCreateRequest")
 
 	request := &csi_spec.CreateVolumeRequest{}
 	request.Name = volName
 
 	// Secrets
 	if csiCredentials == nil {
-		util.LogError.Printf("Missing secrets in the request for %s", volName)
+		log.Errorf("Missing secrets in the request for %s", volName)
 		return nil, fmt.Errorf("empty credentials retrieved. Failing create request for %s", volName)
 	}
 	request.Secrets = csiCredentials
 
 	// Parameters
 	if class.Parameters == nil {
-		util.LogError.Printf("Missing class arameters in the request for %s", volName)
+		log.Errorf("Missing class arameters in the request for %s", volName)
 		return nil, fmt.Errorf("class parameters not present. Failing create request for %s", volName)
 	}
 	request.Parameters = class.Parameters
@@ -441,18 +441,18 @@ func (p *Provisioner) buildCsiVolumeCreateRequest(volName string, class *storage
 	// Add volume capabilities
 	volumeCaps, err := p.getVolumeCapabilities(class, claim)
 	if err != nil {
-		util.LogError.Printf("Failed while building the volume capabilities for %s, err: %v", volName, err.Error())
+		log.Errorf("Failed while building the volume capabilities for %s, err: %v", volName, err.Error())
 		return nil, fmt.Errorf("Unable to build volume capabilities. Failing create request for %s", volName)
 	}
 	request.VolumeCapabilities = volumeCaps
-	util.LogDebug.Printf("CSI volume create request: %+v", request)
+	log.Debugf("CSI volume create request: %+v", request)
 
 	return request, nil
 }
 
 func (p *Provisioner) buildCsiVolumeDeleteRequest(pv *api_v1.PersistentVolume, csiCredentials map[string]string, className string) (*csi_spec.DeleteVolumeRequest, error) {
-	util.LogDebug.Printf(">>>>> getCsiVolumeDeleteRequest for pv %s", pv.Name)
-	defer util.LogDebug.Print("<<<<< getCsiVolumeDeleteRequest")
+	log.Debugf(">>>>> getCsiVolumeDeleteRequest for pv %s", pv.Name)
+	defer log.Debug("<<<<< getCsiVolumeDeleteRequest")
 	request := &csi_spec.DeleteVolumeRequest{}
 
 	if pv.Spec.CSI == nil || pv.Spec.CSI.VolumeHandle == "" {
@@ -461,7 +461,7 @@ func (p *Provisioner) buildCsiVolumeDeleteRequest(pv *api_v1.PersistentVolume, c
 	if className == "" {
 		return nil, fmt.Errorf("no class found to retrieve the volume")
 	}
-	util.LogDebug.Printf("volumeID=%s", pv.Spec.CSI.VolumeHandle)
+	log.Debugf("volumeID=%s", pv.Spec.CSI.VolumeHandle)
 	request.VolumeId = pv.Spec.CSI.VolumeHandle
 
 	request.Secrets = csiCredentials
@@ -469,8 +469,8 @@ func (p *Provisioner) buildCsiVolumeDeleteRequest(pv *api_v1.PersistentVolume, c
 }
 
 func (p *Provisioner) getVolumeContentSource(claim *api_v1.PersistentVolumeClaim) (*csi_spec.VolumeContentSource, error) {
-	util.LogDebug.Printf(">>>>> getVolumeContentSource called for %s", claim.Name)
-	defer util.LogDebug.Printf("<<<<<< getVolumeContentSource")
+	log.Debugf(">>>>> getVolumeContentSource called for %s", claim.Name)
+	defer log.Debug("<<<<<< getVolumeContentSource")
 	snapshotObj, err := p.snapshotClient.VolumesnapshotV1alpha1().VolumeSnapshots(claim.Namespace).Get(claim.Spec.DataSource.Name, meta_v1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting snapshot %s from api server: %v", claim.Spec.DataSource.Name, err)
@@ -481,12 +481,12 @@ func (p *Provisioner) getVolumeContentSource(claim *api_v1.PersistentVolumeClaim
 	if snapshotObj.ObjectMeta.DeletionTimestamp != nil {
 		return nil, fmt.Errorf("snapshot %s is currently being deleted", claim.Spec.DataSource.Name)
 	}
-	util.LogInfo.Printf("VolumeSnapshot %+v", snapshotObj)
+	log.Infof("VolumeSnapshot %+v", snapshotObj)
 	snapContentObj, err := p.snapshotClient.VolumesnapshotV1alpha1().VolumeSnapshotContents().Get(snapshotObj.Spec.SnapshotContentName, meta_v1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting snapshot:snapshotcontent %s:%s from api server: %v", snapshotObj.Name, snapshotObj.Spec.SnapshotContentName, err)
 	}
-	util.LogInfo.Printf("VolumeSnapshotContent %+v", snapContentObj)
+	log.Infof("VolumeSnapshotContent %+v", snapContentObj)
 	if snapContentObj.Spec.VolumeSnapshotSource.CSI == nil {
 		return nil, fmt.Errorf("error getting snapshot source from snapshot:snapshotcontent %s:%s", snapshotObj.Name, snapshotObj.Spec.SnapshotContentName)
 	}
@@ -495,21 +495,21 @@ func (p *Provisioner) getVolumeContentSource(claim *api_v1.PersistentVolumeClaim
 			SnapshotId: snapContentObj.Spec.VolumeSnapshotSource.CSI.SnapshotHandle,
 		},
 	}
-	util.LogInfo.Printf("VolumeContentSource_Snapshot %+v", snapshotSource)
+	log.Infof("VolumeContentSource_Snapshot %+v", snapshotSource)
 	if snapshotObj.Status.RestoreSize != nil {
 		capacity, exists := claim.Spec.Resources.Requests[api_v1.ResourceName(api_v1.ResourceStorage)]
 		if !exists {
 			return nil, fmt.Errorf("error getting capacity for PVC %s when creating snapshot %s", claim.Name, snapshotObj.Name)
 		}
 		volSizeBytes := capacity.Value()
-		util.LogInfo.Printf("Requested volume size is %d and snapshot size is %d for the source snapshot %s", int64(volSizeBytes), int64(snapshotObj.Status.RestoreSize.Value()), snapshotObj.Name)
+		log.Infof("Requested volume size is %d and snapshot size is %d for the source snapshot %s", int64(volSizeBytes), int64(snapshotObj.Status.RestoreSize.Value()), snapshotObj.Name)
 		// When restoring volume from a snapshot, the volume size should
 		// be equal to or larger than its snapshot size.
 		if int64(volSizeBytes) < int64(snapshotObj.Status.RestoreSize.Value()) {
 			return nil, fmt.Errorf("requested volume size %d is less than the size %d for the source snapshot %s", int64(volSizeBytes), int64(snapshotObj.Status.RestoreSize.Value()), snapshotObj.Name)
 		}
 		if int64(volSizeBytes) > int64(snapshotObj.Status.RestoreSize.Value()) {
-			util.LogInfo.Printf("requested volume size %d is greater than the size %d for the source snapshot %s.", int64(volSizeBytes), int64(snapshotObj.Status.RestoreSize.Value()), snapshotObj.Name)
+			log.Infof("requested volume size %d is greater than the size %d for the source snapshot %s.", int64(volSizeBytes), int64(snapshotObj.Status.RestoreSize.Value()), snapshotObj.Name)
 		}
 	}
 	volumeContentSource := &csi_spec.VolumeContentSource{
@@ -519,8 +519,8 @@ func (p *Provisioner) getVolumeContentSource(claim *api_v1.PersistentVolumeClaim
 }
 
 func (p *Provisioner) isCapabilitySupported(capType csi_spec.ControllerServiceCapability_RPC_Type) (bool, error) {
-	util.LogDebug.Printf(">>>>> isCapabilitySupported called with %s", capType)
-	defer util.LogDebug.Printf("<<<<<< isCapabilitySupported")
+	log.Debugf(">>>>> isCapabilitySupported called with %s", capType)
+	defer log.Debug("<<<<<< isCapabilitySupported")
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 	response, err := p.csiDriverClient.ControllerGetCapabilities(ctx, nil)
@@ -529,7 +529,7 @@ func (p *Provisioner) isCapabilitySupported(capType csi_spec.ControllerServiceCa
 		return false, err
 	}
 	for _, cap := range response.GetCapabilities() {
-		util.LogDebug.Printf("handling capability %s", cap.GetRpc().Type)
+		log.Debugf("handling capability %s", cap.GetRpc().Type)
 		if cap.GetRpc().Type == capType {
 			return true, nil
 		}

@@ -18,7 +18,7 @@ package provisioner
 
 import (
 	"fmt"
-	"github.com/hpe-storage/common-host-libs/util"
+	log "github.com/hpe-storage/common-host-libs/logger"
 	storage_v1 "k8s.io/api/storage/v1"
 	storage_v1beta1 "k8s.io/api/storage/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,32 +69,32 @@ func (p *Provisioner) newClassReflector(kubeClient *kubernetes.Clientset) (cache
 func (p *Provisioner) getClass(className string) (*storage_v1.StorageClass, error) {
 	classObj, found, err := p.classStore.GetByKey(className)
 	if err != nil {
-		util.LogError.Printf("error getting class named %s. err=%v", className, err)
+		log.Errorf("error getting class named %s. err=%v", className, err)
 		return nil, err
 	}
 	if !found {
-		util.LogError.Printf("unable to find a class named %s", className)
+		log.Errorf("unable to find a class named %s", className)
 		return nil, fmt.Errorf("unable to find a class named %s", className)
 	}
 	return getStorageClass(classObj)
 }
 
 func (p *Provisioner) getClassOverrideOptions(optionsMap map[string]string) []string {
-	util.LogDebug.Print(">>>> getClassOverrideOptions")
-	defer util.LogDebug.Print("<<<<< getClassOverrideOptions")
+	log.Debug(">>>> getClassOverrideOptions")
+	defer log.Debug("<<<<< getClassOverrideOptions")
 	var overridekeys []string
 	if val, ok := optionsMap[allowOverrides]; ok {
-		util.LogDebug.Printf("allowOverrides %s", val)
+		log.Debugf("allowOverrides %s", val)
 		for _, v := range strings.Split(val, ",") {
 			// remove leading and trailing spaces from value before Trim (needed to support multiline overrides e.g ", ")
 			v = strings.TrimSpace(v)
 			if len(v) > 0 && v != "" {
-				util.LogDebug.Printf("processing key: %v", v)
+				log.Debugf("processing key: %v", v)
 				overridekeys = append(overridekeys, v)
 			}
 		}
 	}
-	util.LogDebug.Printf("resulting override keys :%#v", overridekeys)
+	log.Debugf("resulting override keys :%#v", overridekeys)
 	return overridekeys
 }
 

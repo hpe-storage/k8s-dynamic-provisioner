@@ -19,7 +19,7 @@ package provisioner
 import (
 	"fmt"
 	"github.com/hpe-storage/common-host-libs/chain"
-	"github.com/hpe-storage/common-host-libs/util"
+	log "github.com/hpe-storage/common-host-libs/logger"
 	api_v1 "k8s.io/api/core/v1"
 	"reflect"
 	"time"
@@ -76,7 +76,7 @@ func (m *monitorBind) route(channel chan *updateMessage) (interface{}, error) {
 
 func (m *monitorBind) processClaimMessage(message *updateMessage) (name interface{}, err error) {
 	claim := message.pvc
-	util.LogDebug.Printf("pvc %s updated (UID=%s).  Status is now %s", claim.Name, claim.GetUID(), claim.Status.Phase)
+	log.Debugf("pvc %s updated (UID=%s).  Status is now %s", claim.Name, claim.GetUID(), claim.Status.Phase)
 	if claim.Status.Phase == api_v1.ClaimBound {
 		if m.vol.Name != claim.Spec.VolumeName {
 			info := fmt.Sprintf("pvc %s was satisfied by %s, the pv provisioned was %s", claim.Name, claim.Spec.VolumeName, m.vol.Name)
@@ -84,11 +84,11 @@ func (m *monitorBind) processClaimMessage(message *updateMessage) (name interfac
 			// roll back here or our volume will be left hanging
 			return nil, fmt.Errorf("%s", info)
 		}
-		util.LogDebug.Printf("pvc %s was satisfied by pv %s", claim.Name, claim.Spec.VolumeName)
+		log.Debugf("pvc %s was satisfied by pv %s", claim.Name, claim.Spec.VolumeName)
 		return claim.Spec.VolumeName, nil
 	} else if claim.Status.Phase == api_v1.ClaimLost {
 		info := fmt.Sprintf("pvc %s was lost, reverting volume create (UID=%s)", claim.Name, claim.UID)
-		util.LogError.Print(info)
+		log.Error(info)
 		m.p.eventRecorder.Event(m.origClaim, api_v1.EventTypeWarning, "MonitorBind", info)
 		// roll back here since the claim was lost
 		return nil, fmt.Errorf("pvc %s was lost, reverting volume create (UID=%s)", claim.Name, claim.UID)
@@ -98,22 +98,22 @@ func (m *monitorBind) processClaimMessage(message *updateMessage) (name interfac
 
 func (m *monitorBind) processVolMessage(message *updateMessage) (name interface{}, err error) {
 	volume := message.pv
-	util.LogDebug.Printf("pv %s updated (UID=%s).  Status is now %s", volume.Name, volume.UID, volume.Status.Phase)
+	log.Debugf("pv %s updated (UID=%s).  Status is now %s", volume.Name, volume.UID, volume.Status.Phase)
 	switch volume.Status.Phase {
 	case api_v1.VolumeBound:
 		if m.origClaim.UID != volume.Spec.ClaimRef.UID {
 			info := fmt.Sprintf("pv %s satisfied pvc %s (%s), expecting %s", volume.Name, volume.Spec.ClaimRef.Name, volume.Spec.ClaimRef.UID, m.origClaim.Name)
 			m.p.eventRecorder.Event(volume, api_v1.EventTypeWarning, "MonitorBind", info)
-			util.LogError.Printf(info)
+			log.Errorf(info)
 			//don't roll back here since the volume we created is bound to something
 			return volume.Name, nil
 		}
-		util.LogInfo.Printf("pv %s satisfied pvc %s (%s)", volume.Name, volume.Spec.ClaimRef.Name, volume.Spec.ClaimRef.UID)
+		log.Infof("pv %s satisfied pvc %s (%s)", volume.Name, volume.Spec.ClaimRef.Name, volume.Spec.ClaimRef.UID)
 		return volume.Name, nil
 
 	case api_v1.VolumeReleased:
 		info := fmt.Sprintf("pv %s has been released, claimref was %s (waiting for %s)", volume.Name, volume.Spec.ClaimRef.UID, m.origClaim.UID)
-		util.LogInfo.Printf(info)
+		log.Infof(info)
 		// don't roll back here since the volume will be deleted by the normal workflow
 		return volume.Name, nil
 	}
@@ -122,7 +122,7 @@ func (m *monitorBind) processVolMessage(message *updateMessage) (name interface{
 
 func (m *monitorBind) processTimeout() (interface{}, error) {
 	info := fmt.Sprintf("pvc %s timed out waiting for bind status, reverting volume create (UID=%s)", m.origClaim.Name, m.origClaim.UID)
-	util.LogError.Print(info)
+	log.Error(info)
 	m.p.eventRecorder.Event(m.origClaim, api_v1.EventTypeWarning, "MonitorBind", info)
 	return nil, fmt.Errorf("pvc %s (%s) not bound after timeout", m.origClaim.Name, m.origClaim.GetUID())
 }

@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/hpe-storage/common-host-libs/chain"
-	"github.com/hpe-storage/common-host-libs/util"
+	log "github.com/hpe-storage/common-host-libs/logger"
 	api_v1 "k8s.io/api/core/v1"
 	storage_v1 "k8s.io/api/storage/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,18 +76,18 @@ func (p *Provisioner) newVolumeController() (cache.Store, cache.Controller) {
 func (p *Provisioner) addedVolume(t interface{}) {
 	vol, err := getPersistentVolume(t)
 	if err != nil {
-		util.LogError.Printf("unable to process pv add - %v,  %s", t, err.Error())
+		log.Errorf("unable to process pv add - %v,  %s", t, err.Error())
 	}
 	go p.processVolEvent("added", vol, true)
 }
 
 // nolint: dupl
 func (p *Provisioner) updatedVolume(oldT interface{}, newT interface{}) {
-	util.LogDebug.Print(">>>>>> updatedVolume called")
-	defer util.LogDebug.Print("<<<<<< updatedVolume")
+	log.Debug(">>>>>> updatedVolume called")
+	defer log.Debug("<<<<<< updatedVolume")
 	vol, err := getPersistentVolume(newT)
 	if err != nil {
-		util.LogError.Printf("unable to process pv update - %v,  %s", newT, err.Error())
+		log.Errorf("unable to process pv update - %v,  %s", newT, err.Error())
 	}
 
 	go p.processVolEvent("updatedVol", vol, true)
@@ -95,37 +95,37 @@ func (p *Provisioner) updatedVolume(oldT interface{}, newT interface{}) {
 
 // nolint: dupl
 func (p *Provisioner) deletedVolume(t interface{}) {
-	util.LogDebug.Print(">>>> deletedVolume called")
-	defer util.LogDebug.Print("<<<<<< deletedVolume")
+	log.Debug(">>>> deletedVolume called")
+	defer log.Debug("<<<<<< deletedVolume")
 	vol, err := getPersistentVolume(t)
 	if err != nil {
-		util.LogError.Printf("unable to process pv delete - %v,  %s", t, err.Error())
+		log.Errorf("unable to process pv delete - %v,  %s", t, err.Error())
 	}
 	go p.processVolEvent("deletedVol", vol, false)
 }
 
 // We map updated and deleted events here incase we were not running when the pv state changed to Released.  If rmPV is true, we try to remove the pv object from the cluster.  If its false, we don't.
 func (p *Provisioner) processVolEvent(event string, vol *api_v1.PersistentVolume, rmPV bool) {
-	util.LogInfo.Printf(">>>>> processVolEvent called for event %s vol %s", event, vol.Name)
-	defer util.LogDebug.Print("<<<<< processVolEvent")
+	log.Infof(">>>>> processVolEvent called for event %s vol %s", event, vol.Name)
+	defer log.Info("<<<<< processVolEvent")
 	//notify the monitor
 	go p.sendUpdate(vol)
 
 	if vol.Status.Phase != api_v1.VolumeReleased || vol.Spec.PersistentVolumeReclaimPolicy != api_v1.PersistentVolumeReclaimDelete {
-		util.LogInfo.Printf("%s event: pv:%s phase:%v (reclaim policy:%v) - skipping", event, vol.Name, vol.Status.Phase, vol.Spec.PersistentVolumeReclaimPolicy)
+		log.Infof("%s event: pv:%s phase:%v (reclaim policy:%v) - skipping", event, vol.Name, vol.Status.Phase, vol.Spec.PersistentVolumeReclaimPolicy)
 		return
 	}
 	if _, found := vol.Annotations[k8sProvisionedBy]; !found {
-		util.LogInfo.Printf("%s event: pv:%s phase:%v (reclaim policy:%v) - missing annotation skipping", event, vol.Name, vol.Status.Phase, vol.Spec.PersistentVolumeReclaimPolicy)
+		log.Infof("%s event: pv:%s phase:%v (reclaim policy:%v) - missing annotation skipping", event, vol.Name, vol.Status.Phase, vol.Spec.PersistentVolumeReclaimPolicy)
 		return
 	}
 
 	if !strings.HasPrefix(vol.Annotations[k8sProvisionedBy], CsiProvisioner) && !strings.HasPrefix(vol.Annotations[k8sProvisionedBy], FlexVolumeProvisioner) {
-		util.LogInfo.Printf("%s event: pv:%s phase:%v (reclaim policy:%v) provisioner:%v - unknown provisioner skipping", event, vol.Name, vol.Status.Phase, vol.Spec.PersistentVolumeReclaimPolicy, vol.Annotations[k8sProvisionedBy])
+		log.Infof("%s event: pv:%s phase:%v (reclaim policy:%v) provisioner:%v - unknown provisioner skipping", event, vol.Name, vol.Status.Phase, vol.Spec.PersistentVolumeReclaimPolicy, vol.Annotations[k8sProvisionedBy])
 		return
 	}
 
-	util.LogDebug.Printf("%s event: cleaning up pv:%s phase:%v", event, vol.Name, vol.Status.Phase)
+	log.Debugf("%s event: cleaning up pv:%s phase:%v", event, vol.Name, vol.Status.Phase)
 	p.deleteVolume(vol, rmPV)
 }
 
@@ -142,8 +142,8 @@ func getPersistentVolume(t interface{}) (*api_v1.PersistentVolume, error) {
 
 // get the pv corresponding to this pvc and substitute with pv (docker/csi volume name)
 func (p *Provisioner) getVolumeNameFromClaimName(nameSpace, claimName string) (string, error) {
-	util.LogDebug.Printf(">>>>> getVolumeNameFromClaimName called %s with PVC Name %s", cloneOfPVC, claimName)
-	defer util.LogDebug.Printf("<<<< getVolumeNameFromClaimName")
+	log.Debugf(">>>>> getVolumeNameFromClaimName called %s with PVC Name %s", cloneOfPVC, claimName)
+	defer log.Debug("<<<< getVolumeNameFromClaimName")
 	claim, err := p.getClaimFromPVCName(nameSpace, claimName)
 	if err != nil {
 		return "", err
@@ -155,20 +155,20 @@ func (p *Provisioner) getVolumeNameFromClaimName(nameSpace, claimName string) (s
 }
 
 func (p *Provisioner) parseStorageClassParams(params map[string]string, class *storage_v1.StorageClass, claimSizeinGiB int, listOfOptions []string, nameSpace string) (map[string]interface{}, error) {
-	util.LogDebug.Print(">>>> parseStorageClassParams called")
-	defer util.LogDebug.Print("<<<< parseStorageClassParams")
+	log.Debug(">>>> parseStorageClassParams called")
+	defer log.Debug("<<<< parseStorageClassParams")
 	volCreateOpts := make(map[string]interface{}, len(params))
 	foundSizeKey := false
 	for key, value := range params {
 		if key == cloneOfPVC {
 			pvName, err := p.getVolumeNameFromClaimName(nameSpace, value)
 			if err != nil {
-				util.LogError.Printf("Error to retrieve pvc %s/%s : %s return existing options", nameSpace, value, err.Error())
+				log.Errorf("Error to retrieve pvc %s/%s : %s return existing options", nameSpace, value, err.Error())
 				p.eventRecorder.Event(class, api_v1.EventTypeWarning, "ProvisionStorage",
 					fmt.Sprintf("Error to retrieve pvc %s/%s : %s", nameSpace, value, err.Error()))
 				return nil, err
 			}
-			util.LogDebug.Printf("setting key : cloneOf value : %v", pvName)
+			log.Debugf("setting key : cloneOf value : %v", pvName)
 			volCreateOpts["cloneOf"] = pvName
 			continue
 		}
@@ -177,7 +177,7 @@ func (p *Provisioner) parseStorageClassParams(params map[string]string, class *s
 			foundSizeKey = true
 			for _, option := range listOfOptions {
 				if key == option {
-					util.LogInfo.Printf("storageclass option matched storage resource option:%s ,overriding the value to %d", key, claimSizeinGiB)
+					log.Infof("storageclass option matched storage resource option:%s ,overriding the value to %d", key, claimSizeinGiB)
 					volCreateOpts[key] = claimSizeinGiB
 					break
 				}
@@ -185,7 +185,7 @@ func (p *Provisioner) parseStorageClassParams(params map[string]string, class *s
 		}
 	}
 	if claimSizeinGiB > 0 && !foundSizeKey {
-		util.LogDebug.Print("storage class does not contain size key, overriding to claim size")
+		log.Debug("storage class does not contain size key, overriding to claim size")
 		volCreateOpts["size"] = claimSizeinGiB
 	}
 	return volCreateOpts, nil
@@ -203,7 +203,7 @@ func contains(s []string, e string) bool {
 func (p *Provisioner) newPersistentVolume(pvName string, params map[string]string, claim *api_v1.PersistentVolumeClaim, class *storage_v1.StorageClass) (*api_v1.PersistentVolume, error) {
 	claimRef, err := reference.GetReference(scheme.Scheme, claim)
 	if err != nil {
-		util.LogError.Printf("unable to get reference for claim %v. %s", claim, err)
+		log.Errorf("unable to get reference for claim %v. %s", claim, err)
 		return nil, err
 	}
 
