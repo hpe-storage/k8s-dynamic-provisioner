@@ -550,12 +550,12 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 		return
 	}
 
-	sizeForDockerVolumeinGib := getClaimSizeForFactor(options.claim, dockerClient, 0)
+	sizeForDockerVolumeinGiB := getClaimSizeForFactor(options.claim, dockerClient, 0)
 
 	// handling storage class overrides
 	overrideKeys := p.getClassOverrideOptions(options.classParams)
 	var optionsMap map[string]interface{}
-	optionsMap, err = p.parseStorageClassParams(options.classParams, options.class, sizeForDockerVolumeinGib, dockerClient.ListOfStorageResourceOptions, options.nameSpace)
+	optionsMap, err = p.parseStorageClassParams(options.classParams, options.class, sizeForDockerVolumeinGiB, dockerClient.ListOfStorageResourceOptions, options.nameSpace)
 	if err != nil {
 		log.Errorf("error parsing storage class parameters from %v %v and %v. err=%v", options.claim, options.classParams, options.class, err)
 		return
@@ -570,6 +570,30 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 	}
 
 	log.Debugf("updated optionsMap with overrideKeys %#v", optionsMap)
+
+	baseVolume := ""
+	if val, ok := optionsMap[cloneOf]; ok {
+		baseVolume = val.(string)
+		log.Debugf("found base volume %s for create request of pv %s ", baseVolume, options.volName)
+	}
+
+	// verify if we are creating from existing volume and size matches with requested PVC
+	if baseVolume != "" {
+		vol := p.getDockerVolume(dockerClient, baseVolume)
+		if vol != nil && baseVolume == vol.Name {
+			log.Debugf("got base volume from docker %s", vol.Name)
+			if value, ok := vol.Status["VolSizeMiB"]; ok {
+				baseVolSizeInMiB := value.(float64)
+				baseVolSizeInGiB := int(baseVolSizeInMiB) / 1024
+				if sizeForDockerVolumeinGiB != baseVolSizeInGiB {
+					log.Errorf("failed to create volume %s using base volume %s due to size mismatch of %d vs original size %d", options.volName, baseVolume, sizeForDockerVolumeinGiB, baseVolSizeInGiB)
+					p.eventRecorder.Event(options.class, api_v1.EventTypeWarning, "ProvisionStorage",
+						fmt.Sprintf("failed to create volume %s using base volume %s due to size mismatch", options.volName, baseVolume))
+					return
+				}
+			}
+		}
+	}
 
 	// set default docker options if not already set
 	p.setDefaultDockerOptions(optionsMap, options.classParams, dockerOptions, dockerClient)
@@ -711,7 +735,7 @@ func limit(watched, parked *uint32, max uint32) {
 	}
 }
 
-func getClaimSizeForFactor(claim *api_v1.PersistentVolumeClaim, dockerClient *dockervol.DockerVolumePlugin, sizeForDockerVolumeinGib int) int {
+func getClaimSizeForFactor(claim *api_v1.PersistentVolumeClaim, dockerClient *dockervol.DockerVolumePlugin, sizeForDockerVolumeinGiB int) int {
 	requestParams := claim.Spec.Resources.Requests
 	for key, val := range requestParams {
 		if key == "storage" {
@@ -720,15 +744,15 @@ func getClaimSizeForFactor(claim *api_v1.PersistentVolumeClaim, dockerClient *do
 				if isInt && sizeInBytes > 0 {
 					if dockerClient.ListOfStorageResourceOptions != nil &&
 						dockerClient.FactorForConversion != 0 {
-						sizeForDockerVolumeinGib = int(sizeInBytes) / dockerClient.FactorForConversion
-						log.Debugf("claimSize=%d for size=%d bytes and factorForConversion=%d", sizeForDockerVolumeinGib, sizeInBytes, dockerClient.FactorForConversion)
-						return sizeForDockerVolumeinGib
+						sizeForDockerVolumeinGiB = int(sizeInBytes) / dockerClient.FactorForConversion
+						log.Debugf("claimSize=%d for size=%d bytes and factorForConversion=%d", sizeForDockerVolumeinGiB, sizeInBytes, dockerClient.FactorForConversion)
+						return sizeForDockerVolumeinGiB
 					}
 				}
 			}
 		}
 	}
-	return sizeForDockerVolumeinGib
+	return sizeForDockerVolumeinGiB
 }
 
 func (p *Provisioner) newDockerVolumePluginClient(provisionerName string) (*dockervol.DockerVolumePlugin, map[string]interface{}, error) {
@@ -759,7 +783,7 @@ func (p *Provisioner) newDockerVolumePluginClient(provisionerName string) (*dock
 			strip = b
 		}
 		ss, err := c.GetStringSliceWithError("listOfStorageResourceOptions")
-		if err != nil {
+		if err == nil {
 			listOfStorageResourceOptions = ss
 		}
 		i := c.GetInt64("factorForConversion")
