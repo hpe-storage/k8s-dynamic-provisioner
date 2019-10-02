@@ -28,7 +28,7 @@ ifndef GOOS
 	GOOS = linux
 endif
 
-GOENV = PATH=$$PATH:$(GOPATH)/bin
+GOENV = PATH=$$PATH:$(GOPATH)/bin GLIDE_HOME=$(GOPATH)/.glide BRANCH=$(BRANCH)
 
 build: check-env clean compile image push
 
