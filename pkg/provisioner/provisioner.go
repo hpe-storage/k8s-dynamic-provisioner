@@ -65,7 +65,7 @@ const (
 	cloneOf                    = "cloneOf"
 	cloneOfPVC                 = "cloneOfPVC"
 	manager                    = "manager"
-	managerName                = "k8s"
+	defaultManagerName         = "k8s"
 	id2chanMapSize             = 1024
 	deleteRetrySleep           = 5 * time.Second
 	//CsiProvisioner name prefix
@@ -84,7 +84,7 @@ var (
 	// statusLoggingWait is only used when debug is true
 	statusLoggingWait                   = 5 * time.Second
 	defaultListOfStorageResourceOptions = []string{"size", "sizeInGiB"}
-	defaultDockerOptions                = map[string]interface{}{"mountConflictDelay": 30, manager: managerName}
+	defaultDockerOptions                = map[string]interface{}{manager: defaultManagerName}
 )
 
 // Provisioner provides dynamic pvs based on pvcs and storage classes.
@@ -229,7 +229,7 @@ func NewProvisioner(clientSet *kubernetes.Clientset, csiClientSet *csi_client.Cl
 // update the existing volume's metadata for the claims
 func (p *Provisioner) updateDockerVolumeMetadata(store cache.Store) {
 	log.Debug("updateDockerVolumeMetadata started")
-	optionsMap := map[string]interface{}{manager: managerName}
+	optionsMap := map[string]interface{}{manager: defaultManagerName}
 
 	i := 0
 	for len(store.List()) < 1 {
@@ -875,7 +875,7 @@ func (c *createDockerVol) Rollback() (err error) {
 	log.Debugf(">>>>>> Rollback createDockerVol called with %s", c.requestedName)
 	defer log.Debug("<<<<<< Rollback createDockerVol")
 	if c.returnedName != "" {
-		err = c.client.Delete(c.returnedName, managerName)
+		err = c.client.Delete(c.returnedName, defaultManagerName)
 		if err != nil {
 			err = c.client.Delete(c.returnedName, "")
 		}
@@ -897,7 +897,7 @@ func (c *deleteDockerVol) Run() (name interface{}, err error) {
 	defer log.Debug("<<<<<< Run deleteDockerVol")
 	// slow down if there is a volume delete storm
 	time.Sleep(time.Duration(time.Second))
-	err = c.client.Delete(c.name, managerName)
+	err = c.client.Delete(c.name, defaultManagerName)
 	if err != nil {
 		err = c.client.Delete(c.name, "")
 	}

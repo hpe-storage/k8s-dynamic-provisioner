@@ -111,7 +111,7 @@ func main() {
 		}
 	}
 
-	log.InitLogging(logFilePath, &log.LogParams{Level: "debug"}, false)
+	log.InitLogging(logFilePath, &log.LogParams{Level: "debug"}, true)
 
 	stop := make(chan struct{})
 
