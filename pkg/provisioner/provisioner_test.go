@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	csi_spec "github.com/container-storage-interface/spec/lib/go/csi"
-	crd_client "github.com/hpe-storage/k8s-custom-resources/pkg/client/clientset/versioned"
-	snap_client "github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned"
 	"github.com/hpe-storage/common-host-libs/docker/dockervol"
 	api_v1 "k8s.io/api/core/v1"
 	storage_v1 "k8s.io/api/storage/v1"
@@ -14,7 +11,6 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	rest "k8s.io/client-go/rest"
-	csi_client "k8s.io/csi-api/pkg/client/clientset/versioned"
 )
 
 type testDockerOptions struct {
@@ -137,17 +133,9 @@ func getTestStorageClass() *storage_v1.StorageClass {
 func getTestProvisioner() *Provisioner {
 	config := new(rest.Config)
 	kubeClient, _ := kubernetes.NewForConfig(config)
-	csiClient, _ := csi_client.NewForConfig(config)
-	crdClient, _ := crd_client.NewForConfig(config)
-	snapClient, _ := snap_client.NewForConfig(config)
 	//TODO: update this when running integration tests
-	var csiDriverClient csi_spec.ControllerClient
 	p := NewProvisioner(
 		kubeClient,
-		csiClient,
-		csiDriverClient,
-		crdClient,
-		snapClient,
 		true,
 		true,
 	)

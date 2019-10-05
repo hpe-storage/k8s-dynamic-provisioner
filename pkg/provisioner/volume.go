@@ -120,7 +120,7 @@ func (p *Provisioner) processVolEvent(event string, vol *api_v1.PersistentVolume
 		return
 	}
 
-	if !strings.HasPrefix(vol.Annotations[k8sProvisionedBy], CsiProvisioner) && !strings.HasPrefix(vol.Annotations[k8sProvisionedBy], FlexVolumeProvisioner) {
+	if !strings.HasPrefix(vol.Annotations[k8sProvisionedBy], FlexVolumeProvisioner) {
 		log.Infof("%s event: pv:%s phase:%v (reclaim policy:%v) provisioner:%v - unknown provisioner skipping", event, vol.Name, vol.Status.Phase, vol.Spec.PersistentVolumeReclaimPolicy, vol.Annotations[k8sProvisionedBy])
 		return
 	}
@@ -225,7 +225,7 @@ func (p *Provisioner) newPersistentVolume(pvName string, params map[string]strin
 			Labels:    getClaimMatchLabels(claim),
 			Annotations: map[string]string{
 				"volume.beta.kubernetes.io/storage-class": claimName,
-				k8sProvisionedBy: class.Provisioner,
+				k8sProvisionedBy:                          class.Provisioner,
 			},
 		},
 		Spec: api_v1.PersistentVolumeSpec{

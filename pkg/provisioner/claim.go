@@ -78,8 +78,8 @@ func (p *Provisioner) processAddedClaim(claim *api_v1.PersistentVolumeClaim) {
 		log.Errorf("error getting class named %s for pvc %s. err=%v", className, claim.Name, err)
 		return
 	}
-	if !strings.HasPrefix(class.Provisioner, FlexVolumeProvisioner) && !strings.HasPrefix(class.Provisioner, CsiProvisioner) {
-		log.Infof("class named %s in pvc %s did not refer to a supported provisioner (name must begin with %s or %s).  current provisioner=%s - skipping", className, claim.Name, CsiProvisioner, FlexVolumeProvisioner, class.Provisioner)
+	if !strings.HasPrefix(class.Provisioner, FlexVolumeProvisioner) {
+		log.Infof("class named %s in pvc %s did not refer to a supported provisioner (name must begin with %s).  current provisioner=%s - skipping", className, claim.Name, FlexVolumeProvisioner, class.Provisioner)
 		return
 	}
 

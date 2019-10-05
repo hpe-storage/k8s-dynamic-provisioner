@@ -23,23 +23,17 @@ import (
 	"os/signal"
 	"syscall"
 
-	csi_spec "github.com/container-storage-interface/spec/lib/go/csi"
 	log "github.com/hpe-storage/common-host-libs/logger"
-	crd_client "github.com/hpe-storage/k8s-custom-resources/pkg/client/clientset/versioned"
 	"github.com/hpe-storage/k8s-dynamic-provisioner/pkg/provisioner"
-	snap_client "github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	csi_client "k8s.io/csi-api/pkg/client/clientset/versioned"
 
 	"k8s.io/klog"
 )
 
 var (
-	// init to empty as we always want to get this from env variable
-	csiEndpoint = flag.String("endpoint", "", "Address of the CSI driver socket.")
 	logFilePath = "/var/log/hpe-dynamic-provisioner.log"
 )
 
@@ -79,48 +73,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// csiClient needed for volumeattachment workflows
-	csiClient, err := csi_client.NewForConfig(config)
-	if err != nil {
-		fmt.Printf("Error getting csi client - %s\n", err.Error())
-		os.Exit(1)
-	}
-
-	crdClient, err := crd_client.NewForConfig(config)
-	if err != nil {
-		fmt.Printf("Error getting crd client - %s\n", err.Error())
-		os.Exit(1)
-	}
-
-	snapshotClient, err := snap_client.NewForConfig(config)
-	if err != nil {
-		fmt.Printf("Failed to create snapshot client: %v", err)
-		os.Exit(1)
-	}
-
-	// set the csiEndpoint
-	provisioner.CsiEndpoint = *csiEndpoint
-	var csiDriverClient csi_spec.ControllerClient
-
-	// instantiate a csiDriverClient only if csiEndpoint is not empty
-	if provisioner.CsiEndpoint != "" {
-		csiDriverClient, err = provisioner.GetCsiDriverClient()
-		if err != nil {
-			log.Errorf("Error getting csi driver client for %s - %s", provisioner.CsiProvisioner, err.Error())
-			os.Exit(1)
-		}
-	}
-
 	log.InitLogging(logFilePath, &log.LogParams{Level: "debug"}, true)
 
 	stop := make(chan struct{})
 
 	p := provisioner.NewProvisioner(
 		kubeClient,
-		csiClient,
-		csiDriverClient,
-		crdClient,
-		snapshotClient,
 		true,
 		true,
 	)
