@@ -4,7 +4,7 @@ require (
 	cloud.google.com/go v0.46.3 // indirect
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
-	github.com/container-storage-interface/spec v1.1.0
+	github.com/container-storage-interface/spec v1.1.0 // indirect
 	github.com/coreos/bbolt v1.3.3 // indirect
 	github.com/coreos/etcd v3.3.15+incompatible // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
@@ -28,14 +28,14 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway v1.11.3 // indirect
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/hpe-storage/common-host-libs v0.0.0-20191001172847-50bb6437609e
-	github.com/hpe-storage/k8s-custom-resources v0.0.0-20190725185337-965fa924678a
+	github.com/hpe-storage/k8s-custom-resources v0.0.0-20190725185337-965fa924678a // indirect
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/klauspost/compress v1.8.5 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
-	github.com/kubernetes-csi/csi-lib-utils v0.6.1
-	github.com/kubernetes-csi/external-snapshotter v1.1.0
+	github.com/kubernetes-csi/csi-lib-utils v0.6.1 // indirect
+	github.com/kubernetes-csi/external-snapshotter v1.1.0 // indirect
 	github.com/logrusorgru/aurora v0.0.0-20190803045625-94edacc10f9b // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/mattn/go-isatty v0.0.9 // indirect
@@ -82,7 +82,7 @@ require (
 	k8s.io/api v0.0.0-20190627205229-acea843d18eb
 	k8s.io/apimachinery v0.0.0-20190628045107-49e757626700
 	k8s.io/client-go v0.0.0-20190628005442-8873628f237b
-	k8s.io/csi-api v0.0.0-20190313123203-94ac839bf26c
+	k8s.io/csi-api v0.0.0-20190313123203-94ac839bf26c // indirect
 	k8s.io/klog v0.3.3
 	k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a // indirect
 	mvdan.cc/unparam v0.0.0-20190917161559-b83a221c10a2 // indirect
