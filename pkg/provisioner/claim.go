@@ -223,22 +223,3 @@ func (p *Provisioner) getPVFromPVCAnnotation(claim *api_v1.PersistentVolumeClaim
 	}
 	return pvName, nil
 }
-
-func (p *Provisioner) checkClaimDataSorce(claim *api_v1.PersistentVolumeClaim) (bool, error) {
-	log.Debugf(">>>>> checkClaimDataSorce called for PVC %s", claim.Name)
-	defer log.Debug("<<<<<< checkClaimDataSorce")
-	if claim.Spec.DataSource == nil {
-		return false, nil
-	}
-	// PVC.Spec.DataSource.Name is the name of the VolumeSnapshot API object
-	if claim.Spec.DataSource.Name == "" {
-		return false, fmt.Errorf("the PVC source not found for PVC %s", claim.Name)
-	}
-	if claim.Spec.DataSource.Kind != snapshotKind {
-		return false, fmt.Errorf("the PVC source is not the right type. Expected %s, Got %s", snapshotKind, claim.Spec.DataSource.Kind)
-	}
-	if *(claim.Spec.DataSource.APIGroup) != snapshotAPIGroup {
-		return false, fmt.Errorf("the PVC source does not belong to the right APIGroup. Expected %s, Got %s", snapshotAPIGroup, *(claim.Spec.DataSource.APIGroup))
-	}
-	return true, nil
-}

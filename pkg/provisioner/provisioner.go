@@ -60,14 +60,14 @@ const (
 	allowOverrides             = "allowOverrides"
 	cloneOf                    = "cloneOf"
 	cloneOfPVC                 = "cloneOfPVC"
+	importVol                  = "importVol"
 	manager                    = "manager"
 	defaultManagerName         = "k8s"
 	id2chanMapSize             = 1024
 	deleteRetrySleep           = 5 * time.Second
 	// FlexVolumeProvisioner name prefix
-	FlexVolumeProvisioner = "hpe.com"
-	snapshotKind          = "VolumeSnapshot"
-	snapshotAPIGroup      = "snapshot.storage.k8s.io"
+	FlexVolumeProvisioner      = "hpe.com"
+	CloudFlexVolumeProvisioner = "hpe.com/cv"
 )
 
 var (
@@ -410,6 +410,7 @@ func (p *Provisioner) provisionVolume(claim *api_v1.PersistentVolumeClaim, class
 	for key, value := range class.Parameters {
 		params[key] = value
 	}
+
 	// add name to options
 	params["name"] = volName
 
@@ -453,24 +454,14 @@ func (p *Provisioner) provisionVolume(claim *api_v1.PersistentVolumeClaim, class
 func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 	log.Debug(">>>>> provisionFlexVolume")
 	defer log.Debug("<<<<< provisionFlexVolume")
-	p.dockerVolNameAnnotation = FlexVolumeProvisioner + "/" + dockerVolumeName
-	pv, err := p.newFlexVolPersistentVolume(options.volName, options.classParams, options.claim, options.class)
-	if err != nil {
-		log.Errorf("error building pv from %v %v and %v. err=%v", options.claim, options.classParams, options.class, err)
-		return
-	}
+
 	var dockerClient *dockervol.DockerVolumePlugin
 	var dockerOptions map[string]interface{}
-	dockerClient, dockerOptions, err = p.newDockerVolumePluginClient(options.class.Provisioner)
+	dockerClient, dockerOptions, err := p.newDockerVolumePluginClient(options.class.Provisioner)
 	if err != nil {
 		log.Errorf("unable to get docker client for class %v while trying to provision pvc named %s (%s): %s", options.class, options.claim.Name, options.claimID, err)
 		p.eventRecorder.Event(options.class, api_v1.EventTypeWarning, "ProvisionVolumeGetClient",
 			fmt.Sprintf("failed to get docker volume client for class %s while trying to provision claim %s (%s): %s", options.class.Name, options.claim.Name, options.claimID, err))
-		return
-	}
-	vol := p.getDockerVolume(dockerClient, options.volName)
-	if vol != nil && options.volName == vol.Name {
-		log.Errorf("error provisioning pv from %v and %v. err=Docker volume with this name was found %v.", options.claim, options.class, vol)
 		return
 	}
 
@@ -517,6 +508,26 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 				}
 			}
 		}
+	}
+
+	// use pv name as existing volume name for import request for cloud volumes
+	if importVolName, ok := optionsMap[importVol]; ok && strings.Contains(options.class.Provisioner, CloudFlexVolumeProvisioner) {
+		options.volName = importVolName.(string)
+		optionsMap["name"] = importVolName.(string)
+		log.Debugf("using base volume name %s for import request of pv", options.volName)
+	}
+
+	vol := p.getDockerVolume(dockerClient, options.volName)
+	if vol != nil && options.volName == vol.Name {
+		log.Infof("Duplicate request to provision pv from %v and %v. Volume with this name already exists %v.", options.claim, options.class, vol)
+		return
+	}
+
+	p.dockerVolNameAnnotation = FlexVolumeProvisioner + "/" + dockerVolumeName
+	pv, err := p.newFlexVolPersistentVolume(options.volName, options.classParams, options.claim, options.class)
+	if err != nil {
+		log.Errorf("error building pv from %v %v and %v. err=%v", options.claim, options.classParams, options.class, err)
+		return
 	}
 
 	// set default docker options if not already set
