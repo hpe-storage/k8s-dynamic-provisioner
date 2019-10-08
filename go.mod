@@ -16,8 +16,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20191002201903-404acd9df4cc // indirect
 	github.com/golangci/go-tools v0.0.0-20190124090046-35a9f45a5db0 // indirect
 	github.com/golangci/gocyclo v0.0.0-20180528144436-0a533e8fa43d // indirect
-	github.com/golangci/gofmt v0.0.0-20190930125516-244bba706f1a // indirect
-	github.com/golangci/golangci-lint v1.19.1 // indirect
+	github.com/golangci/golangci-lint v1.20.0 // indirect
 	github.com/golangci/gosec v0.0.0-20180901114220-8afd9cbb6cfb // indirect
 	github.com/golangci/revgrep v0.0.0-20180812185044-276a5c0a1039 // indirect
 	github.com/google/go-cmp v0.3.1 // indirect
@@ -39,8 +38,6 @@ require (
 	github.com/kubernetes-csi/external-snapshotter v1.1.0
 	github.com/logrusorgru/aurora v0.0.0-20190803045625-94edacc10f9b // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
-	github.com/matoous/godox v0.0.0-20190911065817-5d6d842e92eb // indirect
-	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.9 // indirect
 	github.com/mattn/goveralls v0.0.3 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
@@ -51,17 +48,16 @@ require (
 	github.com/prometheus/common v0.7.0 // indirect
 	github.com/prometheus/procfs v0.0.5 // indirect
 	github.com/rogpeppe/fastuuid v1.2.0 // indirect
-	github.com/rogpeppe/go-internal v1.4.0 // indirect
+	github.com/rogpeppe/go-internal v1.5.0 // indirect
 	github.com/russross/blackfriday v2.0.0+incompatible // indirect
 	github.com/satori/go.uuid v1.2.0
-	github.com/securego/gosec v0.0.0-20191002120514-e680875ea14d // indirect
+	github.com/securego/gosec v0.0.0-20191008095658-28c1128b7336 // indirect
 	github.com/shirou/gopsutil v2.19.9+incompatible // indirect
 	github.com/shirou/w32 v0.0.0-20160930032740-bb4de0191aa4 // indirect
 	github.com/shurcooL/go v0.0.0-20190704215121-7189cc372560 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
-	github.com/timakin/bodyclose v0.0.0-20190930140734-f7f2e9bca95e // indirect
 	github.com/ugorji/go v1.1.7 // indirect
-	github.com/ultraware/whitespace v0.0.4 // indirect
+	github.com/uudashr/gocognit v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.5.0 // indirect
 	go.etcd.io/bbolt v1.3.3 // indirect
 	go.opencensus.io v0.22.1 // indirect
@@ -71,14 +67,14 @@ require (
 	golang.org/x/image v0.0.0-20190910094157-69e4b8554b2a // indirect
 	golang.org/x/lint v0.0.0-20190930215403-16217165b5de // indirect
 	golang.org/x/mobile v0.0.0-20191002175909-6d0d39b2ca82 // indirect
-	golang.org/x/net v0.0.0-20191003171128-d98b1b443823 // indirect
+	golang.org/x/net v0.0.0-20191007182048-72f939374954 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
-	golang.org/x/sys v0.0.0-20191003212358-c178f38b412c // indirect
+	golang.org/x/sys v0.0.0-20191008105621-543471e840be // indirect
 	golang.org/x/time v0.0.0-20190921001708-c4c64cad1fd0 // indirect
-	golang.org/x/tools v0.0.0-20191005014404-c9f9432ec4b2 // indirect
+	golang.org/x/tools v0.0.0-20191007185444-6536af71d98a // indirect
 	google.golang.org/api v0.10.0 // indirect
-	google.golang.org/appengine v1.6.4 // indirect
-	google.golang.org/genproto v0.0.0-20191002211648-c459b9ce5143 // indirect
+	google.golang.org/appengine v1.6.5 // indirect
+	google.golang.org/genproto v0.0.0-20191007204434-a023cd5227bd // indirect
 	google.golang.org/grpc v1.24.0 // indirect
 	gopkg.in/airbrake/gobrake.v2 v2.0.9 // indirect
 	gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2 // indirect

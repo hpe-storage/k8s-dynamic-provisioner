@@ -68,8 +68,6 @@ const (
 	// FlexVolumeProvisioner name prefix
 	FlexVolumeProvisioner      = "hpe.com"
 	CloudFlexVolumeProvisioner = "hpe.com/cv"
-	snapshotKind               = "VolumeSnapshot"
-	snapshotAPIGroup           = "snapshot.storage.k8s.io"
 )
 
 var (
@@ -466,11 +464,6 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 			fmt.Sprintf("failed to get docker volume client for class %s while trying to provision claim %s (%s): %s", options.class.Name, options.claim.Name, options.claimID, err))
 		return
 	}
-	vol := p.getDockerVolume(dockerClient, options.volName)
-	if vol != nil && options.volName == vol.Name {
-		log.Errorf("error provisioning pv from %v and %v. err=Docker volume with this name was found %v.", options.claim, options.class, vol)
-		return
-	}
 
 	sizeForDockerVolumeinGiB := getClaimSizeForFactor(options.claim, dockerClient, 0)
 
@@ -522,6 +515,12 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 		options.volName = importVolName.(string)
 		optionsMap["name"] = importVolName.(string)
 		log.Debugf("using base volume name %s for import request of pv", options.volName)
+	}
+
+	vol := p.getDockerVolume(dockerClient, options.volName)
+	if vol != nil && options.volName == vol.Name {
+		log.Infof("Duplicate request to provision pv from %v and %v. Volume with this name already exists %v.", options.claim, options.class, vol)
+		return
 	}
 
 	p.dockerVolNameAnnotation = FlexVolumeProvisioner + "/" + dockerVolumeName
