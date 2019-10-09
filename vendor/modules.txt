@@ -1,5 +1,3 @@
-# github.com/container-storage-interface/spec v1.1.0
-github.com/container-storage-interface/spec/lib/go/csi
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/gogo/protobuf v1.3.0
@@ -9,13 +7,10 @@ github.com/gogo/protobuf/sortkeys
 github.com/golang/groupcache/lru
 # github.com/golang/protobuf v1.3.2
 github.com/golang/protobuf/proto
-github.com/golang/protobuf/protoc-gen-go/descriptor
-github.com/golang/protobuf/ptypes/timestamp
-github.com/golang/protobuf/ptypes/wrappers
-github.com/golang/protobuf/descriptor
-github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
+github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/duration
+github.com/golang/protobuf/ptypes/timestamp
 # github.com/google/go-cmp v0.3.1
 github.com/google/go-cmp/cmp
 github.com/google/go-cmp/cmp/internal/diff
@@ -36,30 +31,15 @@ github.com/hpe-storage/common-host-libs/logger
 github.com/hpe-storage/common-host-libs/chain
 github.com/hpe-storage/common-host-libs/docker/dockervol
 github.com/hpe-storage/common-host-libs/jconfig
-github.com/hpe-storage/common-host-libs/model
 github.com/hpe-storage/common-host-libs/connectivity
 github.com/hpe-storage/common-host-libs/docker/dockerlt
 github.com/hpe-storage/common-host-libs/jsonutil
-# github.com/hpe-storage/k8s-custom-resources v0.0.0-20190725185337-965fa924678a
-github.com/hpe-storage/k8s-custom-resources/pkg/client/clientset/versioned
-github.com/hpe-storage/k8s-custom-resources/pkg/client/clientset/versioned/typed/hpestorage/v1
-github.com/hpe-storage/k8s-custom-resources/pkg/apis/hpestorage/v1
-github.com/hpe-storage/k8s-custom-resources/pkg/client/clientset/versioned/scheme
 # github.com/imdario/mergo v0.3.7
 github.com/imdario/mergo
 # github.com/json-iterator/go v1.1.7
 github.com/json-iterator/go
 # github.com/konsorten/go-windows-terminal-sequences v1.0.2
 github.com/konsorten/go-windows-terminal-sequences
-# github.com/kubernetes-csi/csi-lib-utils v0.6.1
-github.com/kubernetes-csi/csi-lib-utils/connection
-github.com/kubernetes-csi/csi-lib-utils/rpc
-github.com/kubernetes-csi/csi-lib-utils/protosanitizer
-# github.com/kubernetes-csi/external-snapshotter v1.1.0
-github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned
-github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned/typed/volumesnapshot/v1alpha1
-github.com/kubernetes-csi/external-snapshotter/pkg/apis/volumesnapshot/v1alpha1
-github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned/scheme
 # github.com/mitchellh/mapstructure v1.1.2
 github.com/mitchellh/mapstructure
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
@@ -74,19 +54,17 @@ github.com/sirupsen/logrus
 github.com/spf13/pflag
 # golang.org/x/crypto v0.0.0-20191002192127-34f69633bfdc
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20191002035440-2ec189313ef0
-golang.org/x/net/context
+# golang.org/x/net v0.0.0-20191007182048-72f939374954
 golang.org/x/net/http2
-golang.org/x/net/trace
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
-golang.org/x/net/internal/timeseries
 golang.org/x/net/context/ctxhttp
+golang.org/x/net/context
 # golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sys v0.0.0-20191002091554-b397fe3ad8ed
+# golang.org/x/sys v0.0.0-20191008105621-543471e840be
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/text v0.3.2
@@ -96,7 +74,7 @@ golang.org/x/text/unicode/norm
 golang.org/x/text/transform
 # golang.org/x/time v0.0.0-20190921001708-c4c64cad1fd0
 golang.org/x/time/rate
-# google.golang.org/appengine v1.6.4
+# google.golang.org/appengine v1.6.5
 google.golang.org/appengine/urlfetch
 google.golang.org/appengine/internal
 google.golang.org/appengine/internal/urlfetch
@@ -104,42 +82,6 @@ google.golang.org/appengine/internal/base
 google.golang.org/appengine/internal/datastore
 google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
-# google.golang.org/genproto v0.0.0-20191002211648-c459b9ce5143
-google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.24.0
-google.golang.org/grpc
-google.golang.org/grpc/codes
-google.golang.org/grpc/status
-google.golang.org/grpc/balancer
-google.golang.org/grpc/balancer/roundrobin
-google.golang.org/grpc/connectivity
-google.golang.org/grpc/credentials
-google.golang.org/grpc/encoding
-google.golang.org/grpc/encoding/proto
-google.golang.org/grpc/grpclog
-google.golang.org/grpc/internal
-google.golang.org/grpc/internal/backoff
-google.golang.org/grpc/internal/balancerload
-google.golang.org/grpc/internal/binarylog
-google.golang.org/grpc/internal/channelz
-google.golang.org/grpc/internal/envconfig
-google.golang.org/grpc/internal/grpcrand
-google.golang.org/grpc/internal/grpcsync
-google.golang.org/grpc/internal/transport
-google.golang.org/grpc/keepalive
-google.golang.org/grpc/metadata
-google.golang.org/grpc/naming
-google.golang.org/grpc/peer
-google.golang.org/grpc/resolver
-google.golang.org/grpc/resolver/dns
-google.golang.org/grpc/resolver/passthrough
-google.golang.org/grpc/serviceconfig
-google.golang.org/grpc/stats
-google.golang.org/grpc/tap
-google.golang.org/grpc/balancer/base
-google.golang.org/grpc/credentials/internal
-google.golang.org/grpc/binarylog/grpc_binarylog_v1
-google.golang.org/grpc/internal/syscall
 # gopkg.in/inf.v0 v0.9.0
 gopkg.in/inf.v0
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -187,8 +129,6 @@ k8s.io/api/storage/v1alpha1
 k8s.io/apimachinery/pkg/apis/meta/v1
 k8s.io/apimachinery/pkg/api/resource
 k8s.io/apimachinery/pkg/runtime
-k8s.io/apimachinery/pkg/util/sets
-k8s.io/apimachinery/pkg/util/validation
 k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/pkg/conversion
@@ -202,11 +142,12 @@ k8s.io/apimachinery/pkg/util/runtime
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/runtime/serializer/streaming
 k8s.io/apimachinery/pkg/util/net
+k8s.io/apimachinery/pkg/util/sets
 k8s.io/apimachinery/pkg/util/errors
+k8s.io/apimachinery/pkg/util/validation
 k8s.io/apimachinery/pkg/conversion/queryparams
 k8s.io/apimachinery/pkg/util/json
 k8s.io/apimachinery/pkg/util/naming
-k8s.io/apimachinery/pkg/util/validation/field
 k8s.io/apimachinery/pkg/runtime/serializer
 k8s.io/apimachinery/pkg/api/meta
 k8s.io/apimachinery/pkg/util/cache
@@ -215,6 +156,7 @@ k8s.io/apimachinery/pkg/util/diff
 k8s.io/apimachinery/pkg/util/wait
 k8s.io/apimachinery/pkg/util/strategicpatch
 k8s.io/apimachinery/third_party/forked/golang/reflect
+k8s.io/apimachinery/pkg/util/validation/field
 k8s.io/apimachinery/pkg/runtime/serializer/json
 k8s.io/apimachinery/pkg/runtime/serializer/versioning
 k8s.io/apimachinery/pkg/runtime/serializer/protobuf
@@ -236,7 +178,6 @@ k8s.io/client-go/tools/cache
 k8s.io/client-go/tools/record
 k8s.io/client-go/tools/reference
 k8s.io/client-go/discovery
-k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1
 k8s.io/client-go/kubernetes/typed/apps/v1
 k8s.io/client-go/kubernetes/typed/apps/v1beta1
@@ -272,6 +213,7 @@ k8s.io/client-go/kubernetes/typed/settings/v1alpha1
 k8s.io/client-go/kubernetes/typed/storage/v1
 k8s.io/client-go/kubernetes/typed/storage/v1alpha1
 k8s.io/client-go/kubernetes/typed/storage/v1beta1
+k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/pkg/version
 k8s.io/client-go/plugin/pkg/client/auth/exec
 k8s.io/client-go/rest/watch
@@ -291,11 +233,6 @@ k8s.io/client-go/pkg/apis/clientauthentication/v1beta1
 k8s.io/client-go/util/connrotation
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/tools/clientcmd/api/v1
-# k8s.io/csi-api v0.0.0-20190313123203-94ac839bf26c
-k8s.io/csi-api/pkg/client/clientset/versioned
-k8s.io/csi-api/pkg/apis/csi/v1alpha1
-k8s.io/csi-api/pkg/client/clientset/versioned/typed/csi/v1alpha1
-k8s.io/csi-api/pkg/client/clientset/versioned/scheme
 # k8s.io/klog v0.3.3
 k8s.io/klog
 # k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30
