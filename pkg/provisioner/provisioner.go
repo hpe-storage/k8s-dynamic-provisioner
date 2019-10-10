@@ -65,9 +65,9 @@ const (
 	defaultManagerName         = "k8s"
 	id2chanMapSize             = 1024
 	deleteRetrySleep           = 5 * time.Second
-	// FlexVolumeProvisioner name prefix
-	FlexVolumeProvisioner      = "hpe.com"
-	CloudFlexVolumeProvisioner = "hpe.com/cv"
+	// FlexVolumeProvisionerPrefix name prefix
+	FlexVolumeProvisionerPrefix = "hpe.com"
+	CloudFlexVolumeProvisioner  = "hpe.com/cv"
 )
 
 var (
@@ -247,8 +247,8 @@ func (p *Provisioner) updateDockerVolumeMetadata(store cache.Store) {
 			continue
 		}
 
-		if !strings.HasPrefix(class.Provisioner, FlexVolumeProvisioner) {
-			log.Infof("updateDockerVolumeMetadata: class named %s in pvc %s did not refer to a supported provisioner (name must begin with %s).  current provisioner=%s - skipping", className, claim.Name, FlexVolumeProvisioner, class.Provisioner)
+		if !strings.HasPrefix(class.Provisioner, FlexVolumeProvisionerPrefix) {
+			log.Infof("updateDockerVolumeMetadata: class named %s in pvc %s did not refer to a supported provisioner (name must begin with %s).  current provisioner=%s - skipping", className, claim.Name, FlexVolumeProvisionerPrefix, class.Provisioner)
 			continue
 		}
 
@@ -346,7 +346,7 @@ func (p *Provisioner) deleteFlexVolume(pv *api_v1.PersistentVolume, deleteChain 
 	if p.affectDockerVols {
 		dockerClient, _, err := p.newDockerVolumePluginClient(provisioner)
 		if err != nil {
-			info := fmt.Sprintf("failed to get docker client for %s while trying to delete pv %s: %v", FlexVolumeProvisioner, pv.Name, err)
+			info := fmt.Sprintf("failed to get docker client for %s while trying to delete pv %s: %v", FlexVolumeProvisionerPrefix, pv.Name, err)
 			log.Error(info)
 			p.eventRecorder.Event(pv, api_v1.EventTypeWarning, "DeleteVolumeGetClient", info)
 			return
@@ -354,7 +354,7 @@ func (p *Provisioner) deleteFlexVolume(pv *api_v1.PersistentVolume, deleteChain 
 		vol := p.getDockerVolume(dockerClient, pv.Name)
 		if vol != nil && vol.Name == pv.Name {
 			p.eventRecorder.Event(pv, api_v1.EventTypeNormal, "DeleteVolume", fmt.Sprintf("cleaning up volume named %s", pv.Name))
-			log.Debugf("Docker volume with name %s found.  Delete using %s.", pv.Name, FlexVolumeProvisioner)
+			log.Debugf("Docker volume with name %s found.  Delete using %s.", pv.Name, FlexVolumeProvisionerPrefix)
 			deleteChain.AppendRunner(&deleteDockerVol{
 				name:   pv.Name,
 				client: dockerClient,
@@ -477,7 +477,7 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 	}
 
 	// get updated options map for docker after handling overrides and annotations
-	optionsMap, err = p.getClaimOverrideOptions(options.claim, overrideKeys, optionsMap, FlexVolumeProvisioner)
+	optionsMap, err = p.getClaimOverrideOptions(options.claim, overrideKeys, optionsMap, FlexVolumeProvisionerPrefix)
 	if err != nil {
 		p.eventRecorder.Event(options.class, api_v1.EventTypeWarning, "ProvisionStorage", err.Error())
 		log.Errorf("error handling annotations. err=%v", err)
@@ -512,8 +512,11 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 
 	// use pv name as existing volume name for import request for cloud volumes
 	if importVolName, ok := optionsMap[importVol]; ok && strings.Contains(options.class.Provisioner, CloudFlexVolumeProvisioner) {
+		// override default name created with original volume name
 		options.volName = importVolName.(string)
 		optionsMap["name"] = importVolName.(string)
+		// update name used for flexVolume spec
+		options.classParams["name"] = importVolName.(string)
 		log.Debugf("using base volume name %s for import request of pv", options.volName)
 	}
 
@@ -523,7 +526,7 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 		return
 	}
 
-	p.dockerVolNameAnnotation = FlexVolumeProvisioner + "/" + dockerVolumeName
+	p.dockerVolNameAnnotation = FlexVolumeProvisionerPrefix + "/" + dockerVolumeName
 	pv, err := p.newFlexVolPersistentVolume(options.volName, options.classParams, options.claim, options.class)
 	if err != nil {
 		log.Errorf("error building pv from %v %v and %v. err=%v", options.claim, options.classParams, options.class, err)

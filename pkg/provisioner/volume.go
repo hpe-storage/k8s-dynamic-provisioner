@@ -120,7 +120,7 @@ func (p *Provisioner) processVolEvent(event string, vol *api_v1.PersistentVolume
 		return
 	}
 
-	if !strings.HasPrefix(vol.Annotations[k8sProvisionedBy], FlexVolumeProvisioner) {
+	if !strings.HasPrefix(vol.Annotations[k8sProvisionedBy], FlexVolumeProvisionerPrefix) {
 		log.Infof("%s event: pv:%s phase:%v (reclaim policy:%v) provisioner:%v - unknown provisioner skipping", event, vol.Name, vol.Status.Phase, vol.Spec.PersistentVolumeReclaimPolicy, vol.Annotations[k8sProvisionedBy])
 		return
 	}

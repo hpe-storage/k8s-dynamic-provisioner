@@ -78,8 +78,8 @@ func (p *Provisioner) processAddedClaim(claim *api_v1.PersistentVolumeClaim) {
 		log.Errorf("error getting class named %s for pvc %s. err=%v", className, claim.Name, err)
 		return
 	}
-	if !strings.HasPrefix(class.Provisioner, FlexVolumeProvisioner) {
-		log.Infof("class named %s in pvc %s did not refer to a supported provisioner (name must begin with %s).  current provisioner=%s - skipping", className, claim.Name, FlexVolumeProvisioner, class.Provisioner)
+	if !strings.HasPrefix(class.Provisioner, FlexVolumeProvisionerPrefix) {
+		log.Infof("class named %s in pvc %s did not refer to a supported provisioner (name must begin with %s).  current provisioner=%s - skipping", className, claim.Name, FlexVolumeProvisionerPrefix, class.Provisioner)
 		return
 	}
 
@@ -161,7 +161,7 @@ func (p *Provisioner) getClaimOverrideOptions(claim *api_v1.PersistentVolumeClai
 	provisionerName := provisioner
 	for _, override := range overrides {
 		for key, annotation := range claim.Annotations {
-			if strings.HasPrefix(strings.ToLower(key), provisionerName+"/"+strings.ToLower(override)) {
+			if strings.EqualFold(key, provisionerName+"/"+override) {
 				if valOpt, ok := optionsMap[override]; ok {
 					if override == "size" || override == "sizeInGiB" {
 						// do not allow  override of size and sizeInGiB
