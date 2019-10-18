@@ -436,11 +436,11 @@ func (p *Provisioner) provisionVolume(claim *api_v1.PersistentVolumeClaim, class
 	// slow down if there is a create storm of pv/pvc. for regular scenario just introduce a delay
 	time.Sleep(time.Duration(time.Second))
 
-	p.eventRecorder.Event(class, api_v1.EventTypeNormal, "ProvisionStorage", fmt.Sprintf("%s provisioning storage for pvc %s (%s) using class %s", class.Provisioner, claim.Name, id, class.Name))
+	p.eventRecorder.Event(claim, api_v1.EventTypeNormal, "ProvisionStorage", fmt.Sprintf("%s provisioning storage for pvc %s (%s) using class %s", class.Provisioner, claim.Name, id, class.Name))
 	err := provisionChain.Execute()
 	if err != nil {
 		log.Errorf("failed to create volume for claim %s with class %s: %s", claim.Name, class.Name, err)
-		p.eventRecorder.Event(class, api_v1.EventTypeWarning, "ProvisionStorage",
+		p.eventRecorder.Event(claim, api_v1.EventTypeWarning, "ProvisionStorage",
 			fmt.Sprintf("failed to create volume for claim %s with class %s: %s", claim.Name, class.Name, err))
 	}
 
@@ -460,7 +460,7 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 	dockerClient, dockerOptions, err := p.newDockerVolumePluginClient(options.class.Provisioner)
 	if err != nil {
 		log.Errorf("unable to get docker client for class %v while trying to provision pvc named %s (%s): %s", options.class, options.claim.Name, options.claimID, err)
-		p.eventRecorder.Event(options.class, api_v1.EventTypeWarning, "ProvisionVolumeGetClient",
+		p.eventRecorder.Event(options.claim, api_v1.EventTypeWarning, "ProvisionVolumeGetClient",
 			fmt.Sprintf("failed to get docker volume client for class %s while trying to provision claim %s (%s): %s", options.class.Name, options.claim.Name, options.claimID, err))
 		return
 	}
@@ -479,7 +479,7 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 	// get updated options map for docker after handling overrides and annotations
 	optionsMap, err = p.getClaimOverrideOptions(options.claim, overrideKeys, optionsMap, FlexVolumeProvisionerPrefix)
 	if err != nil {
-		p.eventRecorder.Event(options.class, api_v1.EventTypeWarning, "ProvisionStorage", err.Error())
+		p.eventRecorder.Event(options.claim, api_v1.EventTypeWarning, "ProvisionStorage", err.Error())
 		log.Errorf("error handling annotations. err=%v", err)
 		return
 	}
@@ -502,7 +502,7 @@ func (p *Provisioner) provisionFlexVolume(options *volumeCreateOptions) {
 				baseVolSizeInGiB := int(baseVolSizeInMiB) / 1024
 				if sizeForDockerVolumeinGiB != baseVolSizeInGiB {
 					log.Errorf("failed to create volume %s using base volume %s due to size mismatch of %d vs original size %d", options.volName, baseVolume, sizeForDockerVolumeinGiB, baseVolSizeInGiB)
-					p.eventRecorder.Event(options.class, api_v1.EventTypeWarning, "ProvisionStorage",
+					p.eventRecorder.Event(options.claim, api_v1.EventTypeWarning, "ProvisionStorage",
 						fmt.Sprintf("failed to create volume %s using base volume %s due to size mismatch", options.volName, baseVolume))
 					return
 				}
