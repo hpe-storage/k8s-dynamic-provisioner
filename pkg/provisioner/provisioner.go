@@ -44,11 +44,11 @@ import (
 )
 
 const (
-	dockerVolumeName   = "docker-volume-name"
-	flexVolumeBasePath = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
-	k8sProvisionedBy   = "pv.kubernetes.io/provisioned-by"
-	chainTimeout       = 2 * time.Minute
-	chainRetries       = 2
+	dockerVolumeName         = "docker-volume-name"
+	flexVolumeBasePath       = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
+	k8sProvisionedBy         = "pv.kubernetes.io/provisioned-by"
+	createRetrySleepInterval = 5 * time.Second
+	createRetries            = 2
 	//TODO allow this to be set per docker volume driver
 	maxCreates = 4
 	//TODO allow this to be set per docker volume driver
@@ -64,7 +64,8 @@ const (
 	manager                    = "manager"
 	defaultManagerName         = "k8s"
 	id2chanMapSize             = 1024
-	deleteRetrySleep           = 5 * time.Second
+	deleteRetrySleepInterval   = 5 * time.Second
+	deleteRetries              = 2
 	// FlexVolumeProvisionerPrefix name prefix
 	FlexVolumeProvisionerPrefix = "hpe.com"
 	CloudFlexVolumeProvisioner  = "hpe.com/cv"
@@ -321,7 +322,7 @@ func (p *Provisioner) deleteVolume(pv *api_v1.PersistentVolume, rmPV bool) {
 
 	atomic.AddUint32(&p.deleteCommandChains, 1)
 	defer atomic.AddUint32(&p.deleteCommandChains, ^uint32(0))
-	deleteChain := chain.NewChain(chainRetries, deleteRetrySleep)
+	deleteChain := chain.NewChain(deleteRetries, deleteRetrySleepInterval)
 
 	log.Debugf("in deleteVolume: cleaning up pv:%s Status:%v with deleteChain %d parkedCommands %d with affectDockerVols %v", pv.Name, pv.Status, atomic.LoadUint32(&p.deleteCommandChains), atomic.LoadUint32(&p.parkedCommands), p.affectDockerVols)
 	p.deleteFlexVolume(pv, deleteChain, provisioner)
@@ -417,7 +418,7 @@ func (p *Provisioner) provisionVolume(claim *api_v1.PersistentVolumeClaim, class
 	// slow down a create storm
 	limit(&p.provisionCommandChains, &p.parkedCommands, maxCreates)
 
-	provisionChain := chain.NewChain(chainRetries, chainTimeout)
+	provisionChain := chain.NewChain(createRetries, createRetrySleepInterval)
 	atomic.AddUint32(&p.provisionCommandChains, 1)
 	defer atomic.AddUint32(&p.provisionCommandChains, ^uint32(0))
 
