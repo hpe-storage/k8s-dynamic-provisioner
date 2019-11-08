@@ -205,7 +205,7 @@ func (p *Provisioner) getClaimNameSpace(claim *api_v1.PersistentVolumeClaim) str
 
 func (p *Provisioner) getPVFromPVCAnnotation(claim *api_v1.PersistentVolumeClaim, provisioner string) (string, error) {
 	// check to see if we have the cloneOfPVC annotation
-	pvcToClone, foundClonePVC := claim.Annotations[fmt.Sprintf("%s%s", provisioner, cloneOfPVC)]
+	pvcToClone, foundClonePVC := claim.Annotations[fmt.Sprintf("%s/%s", provisioner, cloneOfPVC)]
 	if !foundClonePVC {
 		return "", nil
 	}
