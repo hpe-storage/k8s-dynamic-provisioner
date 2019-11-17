@@ -101,8 +101,6 @@ type Provisioner struct {
 	deleteCommandChains     uint32
 	parkedCommands          uint32
 	debug                   bool
-	// ClusterID stores the ID of the cluster creating a volume
-	ClusterID string
 }
 
 type updateMessage struct {

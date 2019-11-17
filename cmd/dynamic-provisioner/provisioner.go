@@ -25,7 +25,6 @@ import (
 
 	log "github.com/hpe-storage/common-host-libs/logger"
 	"github.com/hpe-storage/k8s-dynamic-provisioner/pkg/provisioner"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -82,15 +81,6 @@ func main() {
 		true,
 		true,
 	)
-
-	// grab the uid from the kube-system namespace and save that as the cluster ID
-	kubeSystemNamespace, err := kubeClient.CoreV1().Namespaces().Get("kube-system", meta_v1.GetOptions{})
-	if err != nil {
-		fmt.Printf("error getting kube-system namespace - %s\n", err.Error())
-		os.Exit(1)
-	}
-	uid := kubeSystemNamespace.GetObjectMeta().GetUID()
-	p.ClusterID = string(uid)
 
 	p.Start(stop)
 
