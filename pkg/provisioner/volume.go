@@ -140,7 +140,7 @@ func getPersistentVolume(t interface{}) (*api_v1.PersistentVolume, error) {
 	}
 }
 
-// get the pv corresponding to this pvc and substitute with pv (docker/csi volume name)
+// get the pv corresponding to this pvc and substitute with pv (docker volume name)
 func (p *Provisioner) getVolumeNameFromClaimName(nameSpace, claimName string) (string, error) {
 	log.Debugf(">>>>> getVolumeNameFromClaimName called %s with PVC Name %s", cloneOfPVC, claimName)
 	defer log.Debug("<<<< getVolumeNameFromClaimName")
@@ -257,22 +257,4 @@ func (p *Provisioner) newFlexVolPersistentVolume(pvName string, params map[strin
 	}
 	return pv, nil
 
-}
-
-func (p *Provisioner) newCsiPersistentVolume(options *volumeCreateOptions) (*api_v1.PersistentVolume, error) {
-	pv, err := p.newPersistentVolume(options.volName, options.classParams, options.claim, options.class)
-	if err != nil {
-		return nil, err
-	}
-	pv.Spec.PersistentVolumeSource = api_v1.PersistentVolumeSource{
-		CSI: &api_v1.CSIPersistentVolumeSource{
-			Driver:                     options.class.Provisioner,
-			VolumeAttributes:           options.classParams,
-			ControllerPublishSecretRef: options.secretRef,
-			NodeStageSecretRef:         options.secretRef,
-			NodePublishSecretRef:       options.secretRef,
-		},
-	}
-	// TODO: does fstype need to be added here. If added to csi plugin create request?
-	return pv, nil
 }

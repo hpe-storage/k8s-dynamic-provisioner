@@ -90,7 +90,6 @@ type Provisioner struct {
 	// classStore provides access to StorageClasses on the cluster
 	classStore              cache.Store
 	claimsStore             cache.Store
-	vaStore                 cache.Store
 	pvStore                 cache.Store
 	id2chan                 map[string]chan *updateMessage
 	id2chanLock             *sync.Mutex
@@ -101,8 +100,6 @@ type Provisioner struct {
 	deleteCommandChains     uint32
 	parkedCommands          uint32
 	debug                   bool
-	// ClusterID stores the ID of the cluster creating a volume
-	ClusterID string
 }
 
 type updateMessage struct {
